@@ -2,51 +2,32 @@ module Geometry.Main where
 
 import Loglude
 
-import Data.Either (Either(..))
-import Effect.Class.Console (log)
-import FRP.Event.AnimationFrame (animationFrame)
-import FRP.Stream as Stream
-import Geometry.Types (Geometry, Vec2, circle, render, streamsToAttributes)
-import Graphics.Canvas (getCanvasElementById, getContext2D)
-import Loglude.Cancelable (perform)
+import Control.Monad.State (modify_)
+import Data.Vec (vec2)
+import Geometry.Types (circle)
+import Graphics.Canvas (Context2D, getCanvasElementById, getContext2D)
 import Loglude.Cancelable as Cancelable
-import Web.HTML.Event.EventTypes as EventTypes
-import Web.HTML.HTMLElement as HtmlElement
-import Web.UIEvent.MouseEvent as MouseEvent
+import Lunarlog.Tea (Tea, launchTea)
 
-onClick :: Stream.Discrete MouseEvent 
-onClick = Cancelable.createStream \emit -> do
-    liftEffect (window >>= document >>= body) >>= traverse_ \body_ -> do
-        listener <- liftEffect $ eventListener 
-            $ MouseEvent.fromEvent >>> traverse_ emit
-        Cancelable.addEventListener EventTypes.click listener false (HtmlElement.toEventTarget body_)
+data MyAction = IncreaseRadius
 
-eitherStream :: forall a b. Stream.Discrete a -> Stream.Discrete b -> Stream.Discrete (Either a b)
-eitherStream first second = Cancelable.createStream \emit -> do
-    Cancelable.subscribe first (Left >>> emit) 
-    Cancelable.subscribe second (Right >>> emit) 
+scene :: Context2D -> Tea Int MyAction
+scene = { context: _, initialState: 10, render, handleAction }
+    where
+    handleAction = case _ of
+        IncreaseRadius -> modify_ (_ + 10)
     
-circleRadius :: Stream.Discrete Unit -> Stream.Discrete Int
-circleRadius init = Stream.fold (\_ previous -> previous + 10) (eitherStream init onClick) 10
-
-objToVec2 :: forall record. RecordLike record => record ( "0" :: Int, "1" :: Int ) -> Vec2
-objToVec2 = unsafeCoerce
-
-myCircle :: Stream.Discrete Unit -> Cancelable Geometry
-myCircle init = do
-    pos <- streamsToAttributes { "0": pure 100 :: Stream.Discrete _, "1": circleRadius init }
-    pure $ circle { fill: "red" } (objToVec2 pos) 40
+    render state = circle 
+        { onClick: const IncreaseRadius
+        , fill: "red"
+        , position: vec2 (state * 2 + 100) 100
+        , radius: state } 
 
 main :: Effect Unit
 main = do
-    getCanvasElementById "canvas" >>= traverse_ \canvas -> do
+    getCanvasElementById "canvas" >>= traverse_ \canvas ->  do
         ctx <- getContext2D canvas
-        init <- Stream.create
-        geom <- perform $ myCircle init.event
-        log $ unsafeCoerce geom
-        init.push unit
-        Stream.subscribe animationFrame \_ -> do
-            render ctx geom
+        Cancelable.perform $ launchTea $ scene ctx
 
 foreign import now :: Effect Number
 

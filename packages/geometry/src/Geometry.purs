@@ -2,137 +2,66 @@ module Geometry.Types where
 
 import Loglude
 
-import Data.Undefined.NoProblem.Closed as Closed
-import Loglude.RecordLike as RecordLike
+import Graphics.Canvas (Context2D)
+import Prim.Row (class Union)
 
-{- consumeGeometry ::  Stream.Discrete Geometry -> Cancelable Geometry
-consumeGeometry stream = 
-    do 
-        let thisRef =  ref' none
-        Cancelable.fromEffect $ Stream.subscribe stream $ write thisRef
-        pure $ fromRef thisRef -}
+data Geometry :: Type -> Type
+data Geometry a
 
-data Geometry
--- data RefGeometry
+type Id :: forall k. k -> k
+type Id a = a
 
 type Vec2 = Vec D2 Int
-type CanvasMouseEvent = { buttons :: Int }
-type GeometryAttributes a = 
-    { fill :: Opt String
-    , onClick :: Opt CanvasMouseEvent -> a }
 
-type GeometryConstructor a f 
-    = forall given.
-    Closed.Coerce given (GeometryAttributes a) => given -> f
+type GenericGeometryAttributes :: forall k. (Type -> k) -> Type -> Row k
+type GenericGeometryAttributes f action = 
+    ( fill :: f String
+    , onClick :: f (CanvasMouseEvent -> action) 
+    )
 
-type ForeignGeometryConstructor a result
-    = GeometryAttributes a -> result
+type GeometryAttributes a = GenericGeometryAttributes Id a
+type IncompleteGeometryAttributes a = GenericGeometryAttributes Opt a
 
-type GroupC = Array Geometry -> Geometry
-type RectC = Vec2 -> Vec2 -> Geometry
-type CircleC = Vec2 -> Int -> Geometry
--- type RefC = Geometry -> RefGeometry
+type GeometryConstructor required action
+    = forall given rest.
+    Union given rest (GeometryAttributes action) => 
+    Record (required given action) -> Geometry action
+
+type ForeignGeometryConstructor required action
+    = Record (required (GeometryAttributes action) action) -> Geometry action
+
+type RequiredAttributes = Row Type -> Type -> Row Type
+
+type RectAttributes :: RequiredAttributes
+type RectAttributes r a = ( position :: Vec2, size :: Vec2 | r )
+
+type CircleAttributes :: RequiredAttributes
+type CircleAttributes r a = ( position :: Vec2, radius :: Int | r )
+
+type GroupAttributes :: RequiredAttributes
+type GroupAttributes r a = ( children :: Array (Geometry a) | r )
+
+type CanvasMouseEvent = { buttons :: Int, position :: Vec2 }
 
 ---------- Constructors
-none :: Geometry 
-none = group' []
+group :: forall a. GeometryConstructor GroupAttributes a 
+group = unsafeCoerce _group
 
-group :: GeometryConstructor GroupC 
-group = RecordLike.coerce >>> _group
+rect :: forall a. GeometryConstructor RectAttributes a
+rect = unsafeCoerce _rect
 
-group' :: GroupC
-group' = group {}
+circle :: forall a. GeometryConstructor CircleAttributes a
+circle = unsafeCoerce _circle
 
-rect :: GeometryConstructor RectC
-rect = RecordLike.coerce >>> _rect
-
-rect' :: RectC
-rect' = rect {}
-
-circle :: GeometryConstructor CircleC
-circle = RecordLike.coerce >>> _circle
-
-circle' :: CircleC
-circle' = circle {}
-
--- ref :: GeometryConstructor RefC
--- ref = RecordLike.coerce >>> _ref
-
--- ref' :: RefC
--- ref' = ref {}
+none :: forall a. Geometry a 
+none = group { children: [] }
 
 ---------- Foreign imports
-foreign import _rect :: ForeignGeometryConstructor RectC
-foreign import _circle :: ForeignGeometryConstructor CircleC
-foreign import _group :: ForeignGeometryConstructor GroupC
--- foreign import _ref :: ForeignGeometryConstructor RefC
+foreign import _rect :: forall a. ForeignGeometryConstructor RectAttributes a
+foreign import _circle :: forall a. ForeignGeometryConstructor CircleAttributes a
+foreign import _group :: forall a. ForeignGeometryConstructor GroupAttributes a
 
--- foreign import fromRef :: RefGeometry -> Geometry
--- foreign import write :: RefGeometry -> Geometry -> Effect Unit
--- foreign import render :: Context2D -> Geometry -> Effect Unit
-
----------- Streams to record
-{- class StreamsToAttribs :: forall k. Row Type -> Row k -> Constraint
-class StreamsToAttribs row target | row -> target where
-    streamsToAttributes :: Record row -> Cancelable (MutableRecord target) 
-
-instance (RowToList row rowList, StreamsToAttribsRL rowList row target) => StreamsToAttribs row target where
-    streamsToAttributes = makeAttribsRL (Proxy :: _ rowList)
-
-class StreamsToAttribsRL :: RowList Type -> Row Type -> Row Type -> Constraint
-class StreamsToAttribsRL rowList row target | rowList row -> target where
-    makeAttribsRL :: Proxy rowList -> Record row -> Cancelable (MutableRecord target)
-
-instance 
-    ( StreamsToAttribsRL tail row target
-    , Row.Cons key (Stream.Discrete prop) remaining row
-    , Row.Cons key prop left target
-    , IsSymbol key
-    ) => StreamsToAttribsRL (RowList.Cons key (Stream.Discrete prop) tail) row target where
-    makeAttribsRL _ r = do
-        let thisStream = Record.get key r
-        result <- makeAttribsRL (Proxy :: _ tail) r
-        Cancelable.fromEffect $ 
-            Stream.subscribe thisStream \current -> MutableRecord.write key current result
-        pure result
-        where
-        key :: Proxy key 
-        key = Proxy
-else instance Closed.Coerce {} (Record target) => StreamsToAttribsRL RowList.Nil row target where
-    makeAttribsRL _ {} = pure $ MutableRecord.fromRecord (Closed.coerce {})  
-
----------- Streams to record 2
-class StreamsToAttribs :: forall k. Row Type -> Row k -> Constraint
-class StreamsToAttribs row target | row -> target where
-    streamsToAttributes :: Record row -> Cancelable (MutableRecord target) 
-
-instance (RowToList row rowList, StreamsToAttribsRL rowList row target) => StreamsToAttribs row target where
-    streamsToAttributes = makeAttribsRL (Proxy :: _ rowList)
-
-class StreamsToAttribsRL :: RowList Type -> Row Type -> Row Type -> Constraint
-class StreamsToAttribsRL rowList row target | rowList row -> target where
-    makeAttribsRL :: Proxy rowList -> Record row -> Cancelable (MutableRecord target)
-
-instance 
-    ( StreamsToAttribsRL tail row left
-    , Row.Cons key (Stream.Discrete prop) remaining row
-    , Row.Cons key prop left target
-    , IsSymbol key
-    ) => StreamsToAttribsRL (RowList.Cons key (Stream.Discrete prop) tail) row target where
-    makeAttribsRL _ r = do
-        result <- makeAttribsRL (Proxy :: _ tail) r
-        let thisStream = Record.get key r
-        let extended = MutableRecord.extend key (unsafeCoerce undefined) result
-        Cancelable.fromEffect $ 
-            Stream.subscribe thisStream \current -> do
-                MutableRecord.write key current extended
-        pure extended
-        where
-        key :: Proxy key 
-        key = Proxy
-else instance 
-    (TypeEquals {| target } {}) => 
-    StreamsToAttribsRL RowList.Nil row target where
-    makeAttribsRL _ {} = pure $ MutableRecord.fromRecord $ (from {})
-    -}
-    
+foreign import render :: forall a. Context2D -> Geometry a -> Effect Unit
+foreign import attributes :: forall a. Geometry a -> Record (IncompleteGeometryAttributes a)
+foreign import children :: forall a. Geometry a -> Array (Geometry a)
+foreign import pointInside :: forall a. Geometry a -> Vec2 -> Boolean
