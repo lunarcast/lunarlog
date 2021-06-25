@@ -5,13 +5,13 @@ import Loglude
 import Control.Monad.State (StateT, execStateT)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
-import Data.Undefined.NoProblem (toMaybe)
+import Data.Undefined.NoProblem as Opt
 import Data.Vec (vec2)
 import Effect.Class.Console (log)
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
-import Geometry.Types (CanvasMouseEvent, Geometry, attributes, children, none, pointInside, render)
+import Geometry.Types (CanvasMouseEvent, ClickCheck(..), Geometry, attributes, children, isClicked, none, render)
 import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Web.Event.Event (EventType)
@@ -65,7 +65,14 @@ launchTea tea = do
                     (MouseEvent.clientY ev) 
                 }
 
-            actions = dispatchEvent currentGeometry event
+            check geom = case Opt.toMaybe attribs.onClick of
+                Just handler | isClicked checkMode event currentGeometry -> Just $ handler event
+                _ -> Nothing
+                where
+                checkMode = Opt.fromOpt MouseInside attribs.clickChecker 
+                attribs = attributes geom 
+
+            actions = dispatchEvent check currentGeometry
 
         case Array.head actions of
             Just first -> do
@@ -80,12 +87,21 @@ launchTea tea = do
     raf :: Stream.Discrete Unit
     raf = animationFrame
 
-dispatchEvent :: forall a. Geometry a -> CanvasMouseEvent -> Array a
-dispatchEvent geometry event = case toMaybe onClick of
-    Just handler | pointInside geometry event.position -> pure $ handler event
-    _ -> next >>= \child -> dispatchEvent child event
+
+{-
+
+We want event handlers to be able to:
+- Continue propagation
+- Access the current event
+- Access the current geometry
+
+-}
+
+dispatchEvent :: forall a. (Geometry a -> Maybe a) -> Geometry a -> Array a
+dispatchEvent check geometry = case check geometry of
+    Just action -> [action]
+    Nothing -> next >>= \child -> dispatchEvent check child
     where
-    { onClick } = attributes geometry
     next = children geometry
 
 eventStream :: forall e. (Event -> Maybe e) -> EventType -> Stream.Discrete e 
@@ -94,3 +110,4 @@ eventStream fromEvent eventType = Cancelable.createStream \emit -> do
         listener <- liftEffect $ eventListener 
             $ fromEvent >>> traverse_ emit
         Cancelable.addEventListener eventType listener false (HtmlElement.toEventTarget body_)
+

@@ -18,3 +18,6 @@ exports.children = (geometry) => {
 
 exports.pointInside = (geometry) => (point) =>
   geom.pointInside(geometry, point);
+
+exports.closestPoint = (geometry) => (point) =>
+  geom.closestPoint(geometry, point, []);

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@thi.ng/geom": "^2.1.18",
-    "@thi.ng/hiccup-canvas": "^1.2.5"
+    "@thi.ng/hiccup-canvas": "^1.2.5",
+    "@thi.ng/vectors": "^6.0.1"
   }
 }
