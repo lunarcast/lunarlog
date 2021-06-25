@@ -7,12 +7,11 @@ import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Undefined.NoProblem as Opt
 import Data.Vec (vec2)
-import Effect.Class.Console (log)
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
 import Geometry.Types (CanvasMouseEvent, ClickCheck(..), Geometry, attributes, children, isClicked, none, render)
-import Graphics.Canvas (Context2D)
+import Graphics.Canvas (Context2D, clearRect)
 import Loglude.Cancelable as Cancelable
 import Web.Event.Event (EventType)
 import Web.Event.Internal.Types (Event)
@@ -20,11 +19,15 @@ import Web.HTML.Event.EventTypes as EventType
 import Web.HTML.HTMLElement as HtmlElement
 import Web.UIEvent.MouseEvent as MouseEvent
 
+type SetupArgs :: Type -> Type -> Type
+type SetupArgs s a = { propagateAction :: a -> Effect Unit }
+
 type Tea s a =
     { initialState :: s
     , render :: s -> Geometry a
     , handleAction :: a -> StateT s Effect Unit
-    , context :: Context2D }
+    , context :: Context2D
+    , setup :: SetupArgs s a -> Cancelable Unit }
 
 data CanvasEvent
     = Click CanvasMouseEvent
@@ -38,6 +41,12 @@ launchTea tea = do
     state <- liftEffect $ Ref.new tea.initialState
     geometry <- liftEffect $ Ref.new none
 
+    let propagateAction action = do 
+          currentState <- Ref.read state
+          newState <- execStateT (tea.handleAction action) currentState
+          Ref.write newState state
+          Ref.write true dirty
+
     let loop = const do
           isDirty <- Ref.read dirty
           when isDirty do
@@ -45,9 +54,9 @@ launchTea tea = do
 
             let currentGeometry = tea.render thisState
 
-            log $ unsafeCoerce currentGeometry
-
             Ref.write currentGeometry geometry
+
+            clearRect tea.context { x: 0.0, y: 0.0, width: 1000.0, height: 1000.0 }
             render tea.context currentGeometry 
 
             Ref.write false dirty
@@ -55,7 +64,6 @@ launchTea tea = do
     Cancelable.subscribe raf loop
     Cancelable.subscribe clicks \ev -> do
         currentGeometry <- Ref.read geometry
-        currentState <- Ref.read state
 
         let event :: CanvasMouseEvent
             event = 
@@ -75,11 +83,10 @@ launchTea tea = do
             actions = dispatchEvent check currentGeometry
 
         case Array.head actions of
-            Just first -> do
-                newState <- execStateT (tea.handleAction first) currentState
-                Ref.write newState state
-                Ref.write true dirty
+            Just first -> propagateAction first
             Nothing -> pure unit
+
+    tea.setup { propagateAction }
     where
     clicks :: Stream.Discrete MouseEvent
     clicks = eventStream (MouseEvent.fromEvent) EventType.click
