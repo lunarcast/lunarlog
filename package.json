@@ -1,0 +1,17 @@
+{
+  "name": "lunarlog",
+  "scripts": {
+    "dev": "rm -rf dist && mkdir dist && cp public/* dist -r && node ./build & live-server dist"
+  },
+  "devDependencies": {
+    "esbuild": "^0.12.9",
+    "esbuild-plugin-purescript": "^1.0.2",
+    "esbuild-sass-plugin": "^1.4.7",
+    "live-server": "^1.2.1",
+    "sass": "^1.35.1"
+  },
+  "dependencies": {
+    "@thi.ng/geom": "^2.1.18",
+    "@thi.ng/hiccup-canvas": "^1.2.5"
+  }
+}
