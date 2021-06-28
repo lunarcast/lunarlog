@@ -28,7 +28,7 @@ import Prelude
 import Data.HashMap (HashMap)
 import Data.Symbol (class IsSymbol)
 import Data.Traversable (class Traversable, traverse_, traverse)
-import Data.Typelevel.Num (D0, D1, D2, D3, D4, d0, d1, d2, d3, d4)
+import Data.Typelevel.Num (D0, D1, D2, D3, D4, D6, d0, d1, d2, d3, d4, d6)
 import Data.Undefined.NoProblem (Opt)
 import Data.Vec (Vec, vec2)
 import Effect (Effect)
