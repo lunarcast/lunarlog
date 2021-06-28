@@ -1,4 +1,4 @@
-module Geometry.Main where
+module Main where
 
 import Prelude
 
@@ -26,7 +26,7 @@ myPattern =
     }
 
 myVisualPattern :: VisualGraph.Pattern
-myVisualPattern = { position: vec2 100 200, width: 100 }
+myVisualPattern = { position: vec2 100.0 200.0, width: 100.0 }
 
 scene :: Context2D -> Tea Unit Unit
 scene context = { context, initialState: unit, render, handleAction, setup }

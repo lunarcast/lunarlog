@@ -1,4 +1,4 @@
-import { main } from "../output/Geometry.Main";
+import { main } from "../output/Main";
 import "./styles/index.scss";
 
 main();
