@@ -3,6 +3,7 @@ module Geometry.Types where
 import Loglude
 
 import Geometry.TextBaseline (TextBaseline)
+import Geometry.Transform (TransformMatrix)
 import Geometry.Vector (Vec2, distance, distanceSquared)
 import Graphics.Canvas (Context2D)
 import Prim.Row (class Union)
@@ -24,8 +25,9 @@ type GenericGeometryAttributes :: forall k. (Type -> k) -> Type -> Row k
 type GenericGeometryAttributes f action = 
     ( fill :: f String
     , stroke :: f String
-    , onClick :: f (CanvasMouseEvent -> action) 
+    , alpha :: f Number
     , clickChecker :: f ClickCheck
+    , onClick :: f (CanvasMouseEvent -> action) 
     )
 
 type GeometryAttributes a = GenericGeometryAttributes Id a
@@ -62,6 +64,9 @@ type CircleAttributes r a = ( position :: Vec2, radius :: Int | r )
 type GroupAttributes :: Attributes
 type GroupAttributes r a = ( children :: Array (Geometry a) | r )
 
+type OptionalGroupAttributes :: Attributes
+type OptionalGroupAttributes r a = ( transform :: TransformMatrix | r )
+
 type TextAttributes :: Attributes
 type TextAttributes r a = ( position :: Vec2, text :: String | r )
 
@@ -71,7 +76,7 @@ type OptionalTextAttributes r a = ( baseline :: TextBaseline | r )
 type CanvasMouseEvent = { buttons :: Int, position :: Vec2 }
 
 ---------- Constructors
-group :: forall a. GeometryConstructor GroupAttributes a 
+group :: forall a. FullGeometryConstructor OptionalGroupAttributes GroupAttributes a 
 group = unsafeCoerce _group
 
 rect :: forall a. GeometryConstructor RectAttributes a
@@ -101,7 +106,8 @@ distanceToShapeSquared geometry point = distanceSquared point (closestPoint geom
 ---------- Foreign imports
 foreign import _rect :: forall a. ForeignGeometryConstructor RectAttributes a
 foreign import _circle :: forall a. ForeignGeometryConstructor CircleAttributes a
-foreign import _group :: forall a. ForeignGeometryConstructor GroupAttributes a
+foreign import _group :: forall a. ForeignGeometryConstructor 
+    (OptionalGroupAttributes <+> GroupAttributes) a
 foreign import _text :: forall a. ForeignGeometryConstructor 
     (OptionalTextAttributes <+> TextAttributes) a
 

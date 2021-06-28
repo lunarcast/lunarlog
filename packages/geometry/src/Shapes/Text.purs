@@ -21,8 +21,8 @@ textConfig =
     where
     aabb (CustomTextAttributes this) = ado
         metrics <- unsafeCoerce <$> measureText ask this.text 
-        in { position: this.position - vec2 0 (metrics.fontBoundingBoxAscent)
-           , size: vec2 metrics.width metrics.fontBoundingBoxDescent
+        in { position: this.position
+           , size: vec2 metrics.width (metrics.fontBoundingBoxDescent + metrics.fontBoundingBoxAscent)
            }
 
 _text :: forall a. Ask Context2D => CustomTextAttributes a -> Geometry a

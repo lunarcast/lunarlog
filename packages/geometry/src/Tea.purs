@@ -4,6 +4,7 @@ import Loglude
 
 import Control.Monad.State (StateT, execStateT)
 import Data.Array as Array
+import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Undefined.NoProblem as Opt
 import Effect.Ref as Ref
@@ -68,7 +69,7 @@ launchTea tea = do
         let event :: CanvasMouseEvent
             event = 
                 { buttons: MouseEvent.buttons ev
-                , position: vec2 
+                , position: toNumber <$> vec2  
                     (MouseEvent.clientX ev) 
                     (MouseEvent.clientY ev) 
                 }
