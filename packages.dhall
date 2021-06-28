@@ -45,5 +45,7 @@ let additions =
 let packages =
       upstream
       with lunarlog-prelude = ./packages/loglude/spago.dhall as Location
+      with lunarlog-geometry = ./packages/geometry/spago.dhall as Location
+      with lunarlog-core = ./packages/core/spago.dhall as Location
 
 in  packages // additions
