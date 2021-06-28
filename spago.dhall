@@ -1,2 +1,2 @@
-    ./packages/geometry/spago.dhall
-//  { sources = [ "./packages/geometry/src/**/*.purs" ] }
+    ./packages/client/spago.dhall
+//  { sources = [ "./packages/client/src/**/*.purs" ] }
