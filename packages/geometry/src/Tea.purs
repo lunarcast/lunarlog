@@ -6,12 +6,12 @@ import Control.Monad.State (StateT, execStateT)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Undefined.NoProblem as Opt
-import Data.Vec (vec2)
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
 import Geometry.Types (CanvasMouseEvent, ClickCheck(..), Geometry, attributes, children, isClicked, none, render)
 import Graphics.Canvas (Context2D, clearRect)
+import Loglude.Ask (class Ask, provide)
 import Loglude.Cancelable as Cancelable
 import Web.Event.Event (EventType)
 import Web.Event.Internal.Types (Event)
@@ -24,7 +24,7 @@ type SetupArgs s a = { propagateAction :: a -> Effect Unit }
 
 type Tea s a =
     { initialState :: s
-    , render :: s -> Geometry a
+    , render :: Ask Context2D => s -> Geometry a
     , handleAction :: a -> StateT s Effect Unit
     , context :: Context2D
     , setup :: SetupArgs s a -> Cancelable Unit }
@@ -52,7 +52,7 @@ launchTea tea = do
           when isDirty do
             thisState <- Ref.read state
 
-            let currentGeometry = tea.render thisState
+            let currentGeometry = provide tea.context $ tea.render thisState
 
             Ref.write currentGeometry geometry
 
