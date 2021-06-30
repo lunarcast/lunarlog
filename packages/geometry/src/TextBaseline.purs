@@ -1,4 +1,11 @@
-module Geometry.TextBaseline where
+module Geometry.TextBaseline 
+    ( TextBaseline
+    , top
+    , hanging
+    , middle
+    , alphabetic
+    , ideographic
+    , bottom ) where
 
 import Loglude
 

@@ -6,13 +6,11 @@ module Geometry.Shapes.Padding
     , xyPadding
     ) where
 
-import Loglude (D4, Opt, Vec, d2, d4, unsafeCoerce)
-import Prelude
+import Loglude 
 
-import Data.Undefined.NoProblem (fromOpt)
 import Data.Vec as Vec
 import Geometry.Transform (translate)
-import Geometry.Types (type (<+>), Attributes, GenericGeometryAttributes, Geometry, GeometryAttributes, Id, FullGeometryConstructor, bounds, group, rect)
+import Geometry.Base (type (<+>), Attributes, GenericGeometryAttributes, Geometry, GeometryAttributes, FullGeometryConstructor, bounds, group, rect)
 import Geometry.Vector (Vec2)
 import Record as Record
 

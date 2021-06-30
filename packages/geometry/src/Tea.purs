@@ -1,18 +1,15 @@
-module Lunarlog.Tea where
+module Geometry.Tea (SetupArgs, Tea, launchTea) where
 
 import Loglude
 
 import Control.Monad.State (StateT, execStateT)
 import Data.Array as Array
-import Data.Int (toNumber)
-import Data.Maybe (Maybe(..))
 import Data.Undefined.NoProblem as Opt
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
-import Geometry.Types (CanvasMouseEvent, ClickCheck(..), Geometry, attributes, children, isClicked, none, render)
+import Geometry.Base (CanvasMouseEvent, ClickCheck(..), Geometry, attributes, children, isClicked, none, render)
 import Graphics.Canvas (Context2D, clearRect)
-import Loglude.Ask (class Ask, provide)
 import Loglude.Cancelable as Cancelable
 import Web.Event.Event (EventType)
 import Web.Event.Internal.Types (Event)

@@ -1,10 +1,12 @@
-module Geometry.Shapes.Text where
+module Geometry.Shapes.Text 
+    ( CustomTextAttributes
+    , text ) where
 
 import Loglude
 
 import Data.Undefined.NoProblem (opt)
 import Geometry.Hiccup (HiccupConfig, buildGeometryBlueprint)
-import Geometry.Types (type (<+>), FullGeometryConstructor, Geometry, OptionalTextAttributes, TextAttributes)
+import Geometry.Base (type (<+>), FullGeometryConstructor, Geometry, OptionalTextAttributes, TextAttributes)
 import Graphics.Canvas (Context2D, measureText)
 import Loglude.Ask (class Ask, ask)
 import Loglude.UntypedArray (UntypedArray)
