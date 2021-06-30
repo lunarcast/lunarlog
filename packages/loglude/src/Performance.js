@@ -1,0 +1,1 @@
+exports.now = () => performance.now();
