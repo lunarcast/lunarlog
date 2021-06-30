@@ -2,13 +2,10 @@ module Lunarlog.Client.VisualGraph.Render where
 
 import Loglude
 
-import Geometry.Shapes.Padding as Padding
-import Geometry.Shapes.Text as Text
-import Geometry.TextBaseline as TextBaseline
-import Geometry.Types (Geometry)
-import Geometry.Types as Geometry
 import Graphics.Canvas (Context2D)
-import Loglude.Ask (class Ask)
+import Geometry (Geometry)
+import Geometry as Geometry
+import Geometry.TextBaseline as TextBaseline
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph as NodeGraph
 
@@ -20,14 +17,14 @@ renderPattern { position, width } { name } = Geometry.group
             , size: vec2 width 100.0
             , fill: "blue"
             }
-        , Padding.aabbPadding
-            { target: Text.text
+        , Geometry.aabbPadding
+            { target: Geometry.text
                 { position
                 , text: name 
                 , stroke: "black"
                 , baseline: TextBaseline.top 
                 }
-            , amount: Padding.equalPadding 30.0
+            , amount: Geometry.equalPadding 30.0
             , alpha: 0.3
             , fill: "yellow"
             }
