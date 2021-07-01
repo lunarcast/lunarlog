@@ -25,26 +25,36 @@ module Loglude
     , module Loglude.Types
     , module Loglude.Performance
     , module Loglude.Ask
-    , module Data.Maybe ) where
+    , module Foreign
+    , module Foreign.Object
+    , module Data.Maybe
+    , module Data.Tuple
+    , module Data.Array.NonEmpty
+    , module Data.Tuple.Nested ) where
 
 import Prelude
 
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.HashMap (HashMap)
 import Data.Int (floor, toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, maybe, maybe')
 import Data.Symbol (class IsSymbol)
 import Data.Traversable (class Traversable, traverse_, traverse)
+import Data.Tuple (Tuple(..), curry, uncurry, swap)
+import Data.Tuple.Nested (type (/\), (/\))
 import Data.Typelevel.Num (D0, D1, D2, D3, D4, D6, d0, d1, d2, d3, d4, d6)
 import Data.Undefined.NoProblem (Opt, fromOpt, opt)
 import Data.Vec (Vec, vec2)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Foreign (Foreign)
+import Foreign.Object (Object)
 import Loglude.Ask (class Ask, ask, provide)
 import Loglude.Cancelable (Cancelable)
 import Loglude.MutableRecord (MutableRecord)
 import Loglude.Performance (now)
 import Loglude.RecordLike (class RecordLike)
-import Loglude.Types (Id, Const)
+import Loglude.Types (Id, Const, Pair)
 import Prim.Row (class Union)
 import Prim.RowList (class RowToList, RowList)
 import Type.Proxy (Proxy(..))
