@@ -17,6 +17,7 @@
   , "record"
   , "type-equality"
   , "web-html"
+  , "profunctor-lesnes"
   ]
 , packages = ../../packages.dhall
 , sources = [ "src/**/*.purs" ]

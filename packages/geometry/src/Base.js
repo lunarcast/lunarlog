@@ -1,3 +1,7 @@
+/** @typedef { import("@thi.ng/geom-api").IShape } Geometry */
+/** @typedef { import("@thi.ng/matrices").Mat23Like } Transform */
+/** @typedef { import("@thi.ng/vectors").Vec2Like } Vec2 */
+
 const geom = require("@thi.ng/geom");
 const hiccup = require("@thi.ng/hiccup-canvas");
 
@@ -27,3 +31,15 @@ exports.closestPoint = (geometry) => (point) =>
   geom.closestPoint(geometry, point, []);
 
 exports.bounds = (shape) => fromAABBLike(geom.bounds(shape));
+
+// Transform related stuff
+exports.translate = (amount) => (geometry) =>
+  geom.translate(geometry, [...amount, 0]);
+
+exports.transform =
+  (/** @type Transform */ matrix) => (/** @type Geometry */ geometry) =>
+    geom.transform(geometry, matrix);
+
+exports.transformVertices =
+  (/** @type {(vec: Vec2) => Vec2} */ f) => (/** @type Geometry */ geometry) =>
+    geom.transformVertices(geometry, f);

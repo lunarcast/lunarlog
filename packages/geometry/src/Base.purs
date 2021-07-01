@@ -18,6 +18,7 @@ module Geometry.Base
     , TextAttributes
     , OptionalTextAttributes
     , CanvasMouseEvent
+    , AllAttributes
     , group
     , rect
     , circle
@@ -28,10 +29,14 @@ module Geometry.Base
     , distanceToShapeSquared
     , render
     , attributes
+    , allAttributes
     , children
     , pointInside
     , closestPoint
     , bounds
+    , translate
+    , transform
+    , transformVertices
     , type (<+>)) where
 
 import Loglude
@@ -78,6 +83,9 @@ type AABBLike r = ( position :: Vec2, size :: Vec2 | r )
 
 type Attributes = Row Type -> Type -> Row Type
 
+type AllAttributes :: Attributes -> Type -> Type
+type AllAttributes attrs a = Record (attrs () a)
+
 type ComposeAttributes :: Attributes -> Attributes -> Attributes
 type ComposeAttributes n m r a = n (m r a) a
 
@@ -96,10 +104,16 @@ type OptionalGroupAttributes :: Attributes
 type OptionalGroupAttributes r a = ( transform :: TransformMatrix | r )
 
 type TextAttributes :: Attributes
-type TextAttributes r a = ( position :: Vec2, text :: String | r )
+type TextAttributes r a = 
+    ( position :: Vec2
+    , text :: String
+    | r )
 
 type OptionalTextAttributes :: Attributes
-type OptionalTextAttributes r a = ( baseline :: TextBaseline | r )
+type OptionalTextAttributes r a = 
+    ( baseline :: TextBaseline
+    , font :: String 
+    | r )
 
 type CanvasMouseEvent = { buttons :: Int, position :: Vec2 }
 
@@ -131,6 +145,9 @@ distanceToShape geometry point = distance point (closestPoint geometry point)
 distanceToShapeSquared :: forall a. Geometry a -> Vec2 -> Number
 distanceToShapeSquared geometry point = distanceSquared point (closestPoint geometry point)
 
+allAttributes :: forall a. Geometry a -> Object Foreign
+allAttributes = unsafeCoerce attributes
+
 ---------- Foreign imports
 foreign import _rect :: forall a. ForeignGeometryConstructor RectAttributes a
 foreign import _circle :: forall a. ForeignGeometryConstructor CircleAttributes a
@@ -146,3 +163,6 @@ foreign import pointInside :: forall a. Geometry a -> Vec2 -> Boolean
 foreign import closestPoint :: forall a. Geometry a -> Vec2 -> Vec2
 foreign import bounds :: forall a. Geometry a -> Record (AABBLike ())
 
+foreign import translate :: forall a. Vec2 -> Geometry a -> Geometry a
+foreign import transform :: forall a. TransformMatrix -> Geometry a -> Geometry a
+foreign import transformVertices :: forall a. (Vec2 -> Vec2) -> Geometry a -> Geometry a

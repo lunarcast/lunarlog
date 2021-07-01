@@ -17,19 +17,7 @@ import Geometry.Tea (SetupArgs, Tea, launchTea)
 import Geometry.TextBaseline (TextBaseline)
 import Geometry.Shapes.Padding (Padding, PaddingPlacement, aabbPadding, equalPadding, xyPadding)
 import Geometry.Shapes.Text (CustomTextAttributes, text)
-import Geometry.Transform 
-    ( TransformMatrix(..)
-    , composeMatrices
-    , identityMatrix
-    , inverse
-    , multiplyVector
-    , rotate
-    , rotateAround
-    , scale
-    , scaleXY
-    , transform
-    , translate
-    )
+import Geometry.Transform (TransformMatrix(..))
 
 
 import Graphics.Canvas (Context2D)

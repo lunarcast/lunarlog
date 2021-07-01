@@ -1,16 +1,15 @@
 module Geometry.Shapes.Padding 
     ( Padding
-    , PaddingPlacement
+    , PaddingPlacement(..)
     , aabbPadding
     , equalPadding
     , xyPadding
     ) where
 
-import Loglude 
+import Loglude
 
 import Data.Vec as Vec
-import Geometry.Transform (translate)
-import Geometry.Base (type (<+>), Attributes, GenericGeometryAttributes, Geometry, GeometryAttributes, FullGeometryConstructor, bounds, group, rect)
+import Geometry.Base (type (<+>), Attributes, GenericGeometryAttributes, Geometry, GeometryAttributes, FullGeometryConstructor, bounds, group, rect, translate)
 import Geometry.Vector (Vec2)
 import Record as Record
 
@@ -33,7 +32,7 @@ xyPadding :: Vec2 -> Padding
 xyPadding a = a `Vec.concat` a
 
 _aabbPadding :: forall a. Record ((PaddingAttributes <+> OptionalPaddingAttributes Opt) (GenericGeometryAttributes Opt a) a) -> Geometry a
-_aabbPadding attributes = group
+_aabbPadding attributes = process $ group
     { children: 
         [ rect $ Record.union (unsafeCoerce attributes :: Record (GeometryAttributes a))
             { position: position - amountTopLeft
@@ -41,14 +40,16 @@ _aabbPadding attributes = group
             } 
         , attributes.target
         ]
-    , transform: case fromOpt FixedCorner attributes.paddingPlacement of
-        FixedCorner -> translate amountTopLeft
-        FixedChild -> mempty
     }
     where
     { position, size } = bounds attributes.target
     amountTopLeft = Vec.take d2 attributes.amount
     amountBottomRight = Vec.drop d2 attributes.amount
+
+    -- | The amount we shift all the children by
+    process = case fromOpt FixedCorner attributes.paddingPlacement of
+        FixedCorner -> translate amountTopLeft
+        FixedChild -> identity
 
 aabbPadding :: forall a. FullGeometryConstructor (OptionalPaddingAttributes Id) PaddingAttributes a
 aabbPadding = unsafeCoerce _aabbPadding
