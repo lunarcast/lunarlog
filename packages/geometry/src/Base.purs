@@ -9,6 +9,7 @@ module Geometry.Base
     , GeometryConstructor
     , ForeignGeometryConstructor
     , AABBLike
+    , AABB
     , Attributes
     , ComposeAttributes
     , RectAttributes
@@ -80,6 +81,7 @@ type ForeignGeometryConstructor required action
     = Record (required (GeometryAttributes action) action) -> Geometry action
 
 type AABBLike r = ( position :: Vec2, size :: Vec2 | r )
+type AABB = Record (AABBLike ())
 
 type Attributes = Row Type -> Type -> Row Type
 

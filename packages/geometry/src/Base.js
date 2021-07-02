@@ -43,3 +43,7 @@ exports.transform =
 exports.transformVertices =
   (/** @type {(vec: Vec2) => Vec2} */ f) => (/** @type Geometry */ geometry) =>
     geom.transformVertices(geometry, f);
+
+geom.pointInside.add("group", (group, point) =>
+  group.children.some((child) => geom.pointInside(child, point))
+);

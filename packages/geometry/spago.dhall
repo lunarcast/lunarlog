@@ -17,7 +17,7 @@
   , "record"
   , "type-equality"
   , "web-html"
-  , "profunctor-lesnes"
+  , "profunctor-lenses"
   ]
 , packages = ../../packages.dhall
 , sources = [ "src/**/*.purs" ]

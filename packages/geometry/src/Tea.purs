@@ -72,13 +72,13 @@ launchTea tea = do
                 }
 
             check geom = case Opt.toMaybe attribs.onClick of
-                Just handler | isClicked checkMode event currentGeometry -> Just $ handler event
+                Just handler | isClicked checkMode event geom -> Just $ handler event
                 _ -> Nothing
                 where
                 checkMode = Opt.fromOpt MouseInside attribs.clickChecker 
                 attribs = attributes geom 
 
-            actions = dispatchEvent check currentGeometry
+            actions =  dispatchEvent check currentGeometry
 
         case Array.head actions of
             Just first -> propagateAction first
@@ -92,22 +92,20 @@ launchTea tea = do
     raf :: Stream.Discrete Unit
     raf = animationFrame
 
-
 {-
-
 We want event handlers to be able to:
 - Continue propagation
 - Access the current event
 - Access the current geometry
-
 -}
 
 dispatchEvent :: forall a. (Geometry a -> Maybe a) -> Geometry a -> Array a
 dispatchEvent check geometry = case check geometry of
-    Just action -> [action]
-    Nothing -> next >>= \child -> dispatchEvent check child
+    Just action -> nested <> [action]
+    Nothing -> nested 
     where
-    next = children geometry
+    nested = next >>= \child -> dispatchEvent check child
+    next = Array.reverse $ children geometry
 
 eventStream :: forall e. (Event -> Maybe e) -> EventType -> Stream.Discrete e 
 eventStream fromEvent eventType = Cancelable.createStream \emit -> do
