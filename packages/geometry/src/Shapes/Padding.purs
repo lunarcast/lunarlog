@@ -9,9 +9,10 @@ module Geometry.Shapes.Padding
 import Loglude
 
 import Data.Vec as Vec
-import Geometry.Base (type (<+>), Attributes, GenericGeometryAttributes, Geometry, GeometryAttributes, FullGeometryConstructor, bounds, group, rect, translate)
+import Geometry.Base (type (<+>), Attributes, FullGeometryConstructor, GenericGeometryAttributes, Geometry, GeometryAttributes, AllAttributes, bounds, group, rect, translate)
 import Geometry.Vector (Vec2)
 import Record as Record
+import Record.Unsafe.Union (unsafeUnion)
 
 type Padding = Vec D4 Number
 
@@ -22,8 +23,8 @@ data PaddingPlacement = FixedChild | FixedCorner
 type PaddingAttributes :: Attributes
 type PaddingAttributes r a = ( target :: Geometry a, amount :: Padding | r )
 
-type OptionalPaddingAttributes :: (Type -> Type) -> Attributes
-type OptionalPaddingAttributes f r a = ( paddingPlacement :: f PaddingPlacement | r )
+type OptionalPaddingAttributes :: Attributes
+type OptionalPaddingAttributes r a = ( paddingPlacement :: PaddingPlacement | r )
 
 equalPadding :: Number -> Padding
 equalPadding = Vec.replicate d4
@@ -31,7 +32,10 @@ equalPadding = Vec.replicate d4
 xyPadding :: Vec2 -> Padding
 xyPadding a = a `Vec.concat` a
 
-_aabbPadding :: forall a. Record ((PaddingAttributes <+> OptionalPaddingAttributes Opt) (GenericGeometryAttributes Opt a) a) -> Geometry a
+defaults :: forall a. AllAttributes OptionalPaddingAttributes a
+defaults = { paddingPlacement: FixedCorner }
+
+_aabbPadding :: forall a. Record ((PaddingAttributes <+> OptionalPaddingAttributes) (GenericGeometryAttributes Opt a) a) -> Geometry a
 _aabbPadding attributes = process $ group
     { children: 
         [ rect $ Record.union (unsafeCoerce attributes :: Record (GeometryAttributes a))
@@ -47,10 +51,9 @@ _aabbPadding attributes = process $ group
     amountBottomRight = Vec.drop d2 attributes.amount
 
     -- | The amount we shift all the children by
-    process = case fromOpt FixedCorner attributes.paddingPlacement of
+    process = case attributes.paddingPlacement of
         FixedCorner -> translate amountTopLeft
         FixedChild -> identity
 
-aabbPadding :: forall a. FullGeometryConstructor (OptionalPaddingAttributes Id) PaddingAttributes a
-aabbPadding = unsafeCoerce _aabbPadding
-
+aabbPadding :: forall a. FullGeometryConstructor OptionalPaddingAttributes PaddingAttributes a
+aabbPadding attribs = unsafeUnion attribs defaults # _aabbPadding

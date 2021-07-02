@@ -11,7 +11,7 @@ module Geometry
     ) where
 
 import Geometry.Base
-import Geometry.Vector 
+import Geometry.Vector (Axis(..), Vec2, _axis, _insideVector, _otherAxis, _x, _y, bimapAxis, buildFromAxis, distance, distanceSquared, fromTuple, indexByAxis, lmapAxis, mapAxis, other, rmapAxis, toTuple, x, y)
 import Geometry.Hiccup (HiccupConfig, buildGeometryBlueprint)
 import Geometry.Tea (SetupArgs, Tea, launchTea)
 import Geometry.TextBaseline (TextBaseline)

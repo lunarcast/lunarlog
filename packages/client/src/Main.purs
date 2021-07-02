@@ -2,11 +2,11 @@ module Main where
 
 import Loglude
 
-import Data.Array.NonEmpty as NonEmptyArray
+import Data.Array as Array
 import Effect.Class.Console (log)
 import Geometry (Context2D, Geometry, Tea, launchTea, x, y)
 import Geometry as Geometry
-import Geometry.Shapes.Flex (Alignment(..), Arrangement(..), createLayout, fixedSizeLayout, withMinimumSize)
+import Geometry.Shapes.Flex (Alignment(..), Arrangement(..), LayoutChild(..), createFlexLayout, withFixedSize, withMinimumSize)
 import Geometry.Shapes.Padding as Padding
 import Geometry.Vector (Axis(..))
 import Graphics.Canvas (getCanvasElementById, getContext2D)
@@ -39,32 +39,20 @@ scene context = { context, initialState: unit, render, handleAction, setup }
     handleAction = case _ of
         Clicked msg -> log $ "Clicked!!! " <> msg 
 
-    arrangements = NonEmptyArray.cons' ArrangeStart [ArrangeCenter, ArrangeEnd, SpaceBetween, SpaceEvenly]
+    arrangements = [ArrangeStart, ArrangeCenter, ArrangeEnd, SpaceBetween, SpaceEvenly]
     
     render :: Ask Context2D => Unit -> Geometry _
-    render _ = withMinimumSize $ createLayout
-            { children: NonEmptyArray.mapWithIndex renderArrangement arrangements
+    render _ = withMinimumSize $ createFlexLayout
+            { children: IsLayout <$> Array.mapWithIndex renderArrangement arrangements
             , position: zero
             , flexAxis: X
             , stretchChildren: true
-            , arrangeChildren: ArrangeStart
-            , alignChildren: AlignStart
             }
 
-    renderArrangement :: Ask Context2D => Int -> Arrangement -> Geometry _
-    renderArrangement index arrangement = withMinimumSize $ createLayout
-        { children: flip NonEmptyArray.cons' 
-           [ Geometry.group 
-                { children:  
-                    [ Geometry.rect 
-                        { position: vec2 0.0 40.0
-                        , size 
-                        , fill: "blue" 
-                        }
-                    , geom
-                    ]
-                }
-           ] $ Geometry.aabbPadding  
+    renderArrangement :: Ask Context2D => Int -> Arrangement -> _
+    renderArrangement index arrangement = createFlexLayout
+        { children:
+           [ NotLayout $ Geometry.aabbPadding  
                 { target: Geometry.text 
                     { text: show arrangement
                     , font: "20px Source Code Pro"
@@ -73,20 +61,32 @@ scene context = { context, initialState: unit, render, handleAction, setup }
                     }
                 , amount: Geometry.equalPadding 10.0
                 }
+            , NotLayout $ Geometry.aabbPadding
+                { target: Geometry.group 
+                    { children:  
+                        [ Geometry.rect 
+                            { position: vec2 0.0 0.0
+                            , size 
+                            , fill: "blue" 
+                            }
+                        , geom
+                        ]
+                    }
+                , amount: Geometry.equalPadding 8.0
+                }
+           ] 
         , position: zero
         , flexAxis: Y
         , stretchChildren: true
-        , arrangeChildren: ArrangeStart
         , alignChildren: AlignMiddle
         }
         where
-        geom = fixedSizeLayout layout size 
+        geom = withFixedSize layout size 
         size = vec2 (x layout.minimumSize) (y layout.minimumSize + 100.0)
-        layout = createLayout
-            { children: addPadding <$> NonEmptyArray.cons' a [b, c] 
-            , position: vec2 0.0 40.0
+        layout = createFlexLayout
+            { children: NotLayout <$> addPadding <$> [a, b, c] 
+            , position: vec2 0.0 0.0
             , flexAxis: Y
-            , stretchChildren: false
             , arrangeChildren: arrangement
             , alignChildren: AlignMiddle
             }

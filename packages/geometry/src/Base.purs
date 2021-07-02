@@ -2,6 +2,7 @@
 module Geometry.Base 
     ( Geometry
     , ClickCheck(..)
+    , FullConstructor
     , GenericGeometryAttributes
     , GeometryAttributes
     , IncompleteGeometryAttributes
@@ -67,11 +68,16 @@ type GenericGeometryAttributes f action =
 type GeometryAttributes a = GenericGeometryAttributes Id a
 type IncompleteGeometryAttributes a = GenericGeometryAttributes Opt a
 
-type FullGeometryConstructor :: forall k. (Row Type -> Type -> Row k) -> (Row k -> Type -> Row Type) -> Type -> Type
-type FullGeometryConstructor optional required action
+-- | Generic constructor which depends on the action and has optional attributes
+type FullConstructor :: forall k. (Type -> Type) -> (Row Type -> Type -> Row k) -> (Row k -> Type -> Row Type) -> Type -> Type
+type FullConstructor f optional required action
     = forall given rest.
     Union given rest (optional (GeometryAttributes action) action) => 
-    Record (required given action) -> Geometry action
+    Record (required given action) -> f action
+
+-- | Constructor for geometries with optional parameters
+type FullGeometryConstructor :: forall k. (Row Type -> Type -> Row k) -> (Row k -> Type -> Row Type) -> Type -> Type
+type FullGeometryConstructor optional required action = FullConstructor Geometry optional required action
 
 -- | Geometry constructor with no optional parameters
 type GeometryConstructor required action = 

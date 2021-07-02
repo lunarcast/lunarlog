@@ -1,16 +1,24 @@
 -- | Flexbox inspired layouting system
-module Geometry.Shapes.Flex where
+module Geometry.Shapes.Flex 
+    ( Arrangement(..)
+    , Alignment(..)
+    , LayoutChild(..)
+    , FlexInputAttributes
+    , OptionalFlexAttributes
+    , FlexLayout
+    , withFixedSize
+    , withMinimumSize
+    , createFlexLayout
+    ) where
 
 import Loglude
 
-import Data.Array.NonEmpty as NonEmptyArray
-import Data.Semigroup.Foldable (maximum)
-import Data.Typelevel.Undefined (undefined)
-import Foreign (unsafeFromForeign)
-import Foreign.Object as Object
-import Geometry (Attributes, Geometry, HiccupConfig, Vec2, AllAttributes, allAttributes, bounds, buildFromAxis, group, indexByAxis, none, other, translate)
-import Geometry.Base (AABB)
+import Data.Array as Array
+import Data.Foldable (maximum)
+import Geometry (AllAttributes, Attributes, Geometry, Vec2, bounds, buildFromAxis, group, indexByAxis, none, other, translate)
+import Geometry.Base (type (<+>), AABB, FullConstructor)
 import Geometry.Vector (Axis, rmapAxis)
+import Record.Unsafe.Union (unsafeUnion)
 
 data Arrangement
     = ArrangeStart
@@ -24,69 +32,88 @@ data Alignment
     | AlignMiddle
     | AlignEnd
 
-data FlexAxis
-    = FlexX
-    | FlexY
+data LayoutChild a
+    = NotLayout (Geometry a)
+    | IsLayout (FlexLayout a)
 
 type FlexInputAttributes :: Attributes
 type FlexInputAttributes r a = 
-    ( children :: NonEmptyArray (Geometry a)
+    ( children :: Array (LayoutChild a)
     , position :: Vec2
     , flexAxis :: Axis
-    , stretchChildren :: Boolean
+    | r )
+
+type OptionalFlexAttributes :: Attributes
+type OptionalFlexAttributes r a =
+    ( stretchChildren :: Boolean
     , arrangeChildren :: Arrangement
     , alignChildren :: Alignment
     | r )
 
-type FlexComputedAttributes :: Attributes
-type FlexComputedAttributes r a =
-    ( fixSize :: Vec2 -> Geometry a
-    , minimumSize :: Vec2 | r )
+type FlexLayout a = 
+    { fixSize :: Vec2 -> Geometry a
+    , minimumSize :: Vec2
+    , position :: Vec2
+    }
 
-fixedSizeLayout :: forall a. AllAttributes FlexComputedAttributes a -> Vec2 -> Geometry a
-fixedSizeLayout { fixSize } size = fixSize size 
+defaults :: forall a. AllAttributes OptionalFlexAttributes a
+defaults = 
+    { stretchChildren: false
+    , arrangeChildren: ArrangeStart
+    , alignChildren: AlignStart
+    }
 
-withMinimumSize :: forall a. AllAttributes FlexComputedAttributes a -> Geometry a
-withMinimumSize attributes = fixedSizeLayout attributes attributes.minimumSize
+withFixedSize :: forall a. FlexLayout a -> Vec2 -> Geometry a
+withFixedSize { fixSize } size = fixSize size 
 
-createLayout 
-    :: forall a. 
-        AllAttributes FlexInputAttributes a -> 
-        AllAttributes FlexComputedAttributes a
-createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretchChildren, position } = 
+withMinimumSize :: forall a. FlexLayout a -> Geometry a
+withMinimumSize { fixSize, minimumSize } = fixSize minimumSize
+
+-- | Create a flex layout
+createFlexLayout :: forall a. FullConstructor FlexLayout OptionalFlexAttributes FlexInputAttributes a
+createFlexLayout attribs = unsafeUnion attribs defaults # _createLayout
+
+-- | Internal version of createLayout with fully saturated inputs
+_createLayout :: forall a. 
+        AllAttributes (FlexInputAttributes <+> OptionalFlexAttributes) a -> 
+        FlexLayout a
+_createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretchChildren, position } =
     { fixSize: \exact -> stackFixed exact
     , minimumSize: buildFromAxis axis primarySize secondarySize
+    , position
     }
     where
-    childrenSizes :: NonEmptyArray AABB
-    childrenSizes = bounds <$> children
+    childrenSizes :: Array AABB
+    childrenSizes = children <#> case _ of
+        NotLayout a -> bounds a
+        IsLayout { position, minimumSize } -> { position, size: minimumSize }
 
     primarySize :: Number
-    primarySize = NonEmptyArray.foldr1 (+) $ (_.size >>> indexByAxis axis) <$> childrenSizes
-
+    primarySize = foldr (+) 0.0 $ (_.size >>> indexByAxis axis) <$> childrenSizes
+ 
     secondarySize :: Number
-    secondarySize = maximum $ (indexByAxis (other axis) <<<_.size) <$> childrenSizes
+    secondarySize = fromMaybe 0.0 $ maximum $ (indexByAxis (other axis) <<<_.size) <$> childrenSizes
 
     stackFixed :: Vec2 -> Geometry a
     stackFixed fixedSize = group
-        { children: NonEmptyArray.scanl scanner (startingOffset /\ none) childrenWithFixedSizes <#> snd # NonEmptyArray.toArray
+        { children: Array.scanl scanner (startingOffset /\ none) childrenWithFixedSizes <#> snd
         }
         where
-        childrenWithSizes :: NonEmptyArray (Geometry a /\ AABB)
-        childrenWithSizes = NonEmptyArray.zip children childrenSizes
+        childrenWithSizes :: Array (LayoutChild a /\ AABB)
+        childrenWithSizes = Array.zip children childrenSizes
 
-        childrenWithFixedSizes :: NonEmptyArray (Geometry a /\ AABB)
-        childrenWithFixedSizes = childrenWithSizes <#> fixSize
+        childrenWithFixedSizes :: Array (Geometry a /\ AABB)
+        childrenWithFixedSizes = childrenWithSizes <#> uncurry fixSize
             where
             childSecondarySize :: Number -> Number
             childSecondarySize minimumSize | stretchChildren = indexByAxis (other axis) fixedSize
                                            | otherwise = minimumSize
 
-            fixSize :: (Geometry a /\ AABB) -> (Geometry a /\ AABB)
-            fixSize (child /\ { size }) = do
-                let fixedChild = renderWithSize child
-                        $ rmapAxis axis childSecondarySize size
-                fixedChild /\ bounds fixedChild
+            fixSize :: LayoutChild a -> AABB -> (Geometry a /\ AABB)
+            fixSize (NotLayout geometry) oldBounds = geometry /\ oldBounds
+            fixSize (IsLayout { fixSize, minimumSize, position }) { size } = do
+                let fixedChild = fixSize $ rmapAxis axis childSecondarySize size
+                fixedChild /\ { position, size }
 
         totalSize :: Vec2
         totalSize = sum $ (_.size <<< snd) <$> childrenWithFixedSizes
@@ -96,7 +123,7 @@ createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretch
         emptyPrimarySpace = indexByAxis axis fixedSize - indexByAxis axis totalSize
 
         childrenCount :: Number
-        childrenCount = toNumber $ NonEmptyArray.length children
+        childrenCount = toNumber $ Array.length children
 
         startingOffset :: Number
         startingOffset = case arrangeChildren of
@@ -123,27 +150,6 @@ createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretch
 
             newOffset :: Number
             newOffset = indexByAxis axis (fixedBounds.size + screenOffset)
-
-renderWithSize :: forall a. Geometry a -> Vec2 -> Geometry a 
-renderWithSize geom finalSize = case Object.lookup "fixSize" $ allAttributes geom of
-    Just foreignFixSize -> fixSize finalSize
-        where
-        fixSize :: Vec2 -> Geometry a 
-        fixSize = unsafeFromForeign foreignFixSize
-    Nothing -> geom
-
--- | Transforms a tuple x /\ y into a tuple 
--- | where the axis we are distributing the items on is first
-orderByAxis :: forall a. FlexAxis -> a /\ a -> a /\ a
-orderByAxis FlexX = identity
-orderByAxis FlexY = swap
-
-flexConfig :: HiccupConfig (AllAttributes FlexInputAttributes)
-flexConfig = 
-    { translate: undefined
-    , toHiccup: unsafeCoerce (identity :: _ -> _)
-    , aabbLike: opt \this -> pure { position: this.position, size: zero }  }
-
 
 ---------- Typeclass instances
 derive instance Generic Arrangement _
