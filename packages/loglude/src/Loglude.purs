@@ -30,6 +30,9 @@ module Loglude
     , module Data.Maybe
     , module Data.Tuple
     , module Data.Array.NonEmpty
+    , module Data.Foldable
+    , module Data.Generic.Rep
+    , module Data.Show.Generic
     , module Data.Tuple.Nested ) where
 
 import Prelude
@@ -40,7 +43,7 @@ import Data.Int (floor, toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, maybe, maybe')
 import Data.Symbol (class IsSymbol)
 import Data.Traversable (class Traversable, traverse_, traverse)
-import Data.Tuple (Tuple(..), curry, uncurry, swap)
+import Data.Tuple (Tuple(..), curry, uncurry, swap, fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Typelevel.Num (D0, D1, D2, D3, D4, D6, d0, d1, d2, d3, d4, d6)
 import Data.Undefined.NoProblem (Opt, fromOpt, opt)
@@ -65,3 +68,7 @@ import Web.HTML (window)
 import Web.HTML.HTMLDocument (body)
 import Web.HTML.Window (document)
 import Web.UIEvent.MouseEvent (MouseEvent)
+
+import Data.Foldable (class Foldable, foldr, foldl, foldMap, sum)
+import Data.Generic.Rep (class Generic)
+import Data.Show.Generic (genericShow)
