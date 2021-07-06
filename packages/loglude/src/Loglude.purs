@@ -42,14 +42,14 @@ module Loglude
 
 import Prelude
 
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Lens.Lens.Tuple (_1, _2)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Foldable (class Foldable, foldr, foldl, foldMap, sum)
 import Data.Generic.Rep (class Generic)
 import Data.HashMap (HashMap)
 import Data.Int (floor, toNumber)
-import Data.Lens (Lens', over, set, preview, view, lens)
+import Data.Lens (Lens', Lens, Setter, Setter', Getter, Getter', over, set, preview, view, lens)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe, maybe, maybe')
