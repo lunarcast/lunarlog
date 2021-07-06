@@ -2,16 +2,13 @@ module Main where
 
 import Loglude
 
-import Data.Array as Array
 import Effect.Class.Console (log)
-import Geometry (Context2D, Geometry, Tea, launchTea, x, y)
-import Geometry as Geometry
-import Geometry.Shapes.Flex (Alignment(..), Arrangement(..), LayoutChild(..), createFlexLayout, withFixedSize, withMinimumSize)
-import Geometry.Shapes.Padding as Padding
-import Geometry.Vector (Axis(..))
+import Geometry (Context2D, Geometry, Tea, launchTea)
+import Geometry.Shapes.Flex (Arrangement(..), withMinimumSize)
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Loglude.Cancelable as Cancelable
 import Lunarlog.Canvas (fixDpi)
+import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph as NodeGraph
 
@@ -20,9 +17,16 @@ myPattern =
     { name: "Example pattern"
     , arguments: 
         [ NodeGraph.Pin $ NodeGraph.PinId 0
+        , NodeGraph.Pin $ NodeGraph.PinId 1
         , NodeGraph.NestedPattern
-            { name: "Zero"
-            , arguments: [] 
+            { name: "Tuple"
+            , arguments: 
+                [ NodeGraph.NestedPattern
+                    { name: "Zero"
+                    , arguments: []
+                    }
+                , NodeGraph.Pin $ NodeGraph.PinId 2
+                ] 
             }
         ] 
     }
@@ -42,66 +46,7 @@ scene context = { context, initialState: unit, render, handleAction, setup }
     arrangements = [ArrangeStart, ArrangeCenter, ArrangeEnd, SpaceBetween, SpaceEvenly]
     
     render :: Ask Context2D => Unit -> Geometry _
-    render _ = withMinimumSize $ createFlexLayout
-            { children: IsLayout <$> Array.mapWithIndex renderArrangement arrangements
-            , position: zero
-            , flexAxis: X
-            , stretchChildren: true
-            }
-
-    renderArrangement :: Ask Context2D => Int -> Arrangement -> _
-    renderArrangement index arrangement = createFlexLayout
-        { children:
-           [ NotLayout $ Geometry.aabbPadding  
-                { target: Geometry.text 
-                    { text: show arrangement
-                    , font: "20px Source Code Pro"
-                    , position: zero
-                    , fill: "black"
-                    }
-                , amount: Geometry.equalPadding 10.0
-                }
-            , NotLayout $ Geometry.aabbPadding
-                { target: Geometry.group 
-                    { children:  
-                        [ Geometry.rect 
-                            { position: vec2 0.0 0.0
-                            , size 
-                            , fill: "blue" 
-                            }
-                        , geom
-                        ]
-                    }
-                , amount: Geometry.equalPadding 8.0
-                }
-           ] 
-        , position: zero
-        , flexAxis: Y
-        , stretchChildren: true
-        , alignChildren: AlignMiddle
-        }
-        where
-        geom = withFixedSize layout size 
-        size = vec2 (x layout.minimumSize) (y layout.minimumSize + 100.0)
-        layout = createFlexLayout
-            { children: NotLayout <$> addPadding <$> [a, b, c] 
-            , position: vec2 0.0 0.0
-            , flexAxis: Y
-            , arrangeChildren: arrangement
-            , alignChildren: AlignMiddle
-            }
-
-        addPadding g = Geometry.aabbPadding 
-                    { target: g
-                    , amount: Geometry.equalPadding 10.0 
-                    , fill: "yellow"
-                    , onClick: const $ Clicked "something else"
-                    , paddingPlacement: Padding.FixedCorner
-                    }
-
-        a = Geometry.text { text: "Something", onClick: const $ Clicked "something", font: "30px Arial", position: zero, stroke: "black" } 
-        b = Geometry.text { text: "Short", position: zero, fill: "black" } 
-        c = Geometry.text { text: "Long text!", font: "20px Source Code Pro", position: zero, fill: "black" } 
+    render _ = withMinimumSize $ renderPattern (Just myVisualPattern) myPattern 0.0
 
 main :: Effect Unit
 main = do
