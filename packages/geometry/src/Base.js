@@ -24,18 +24,10 @@ exports.children = (geometry) => {
   return [];
 };
 
-exports.pointInside = (geometry) => (point) =>
-  geom.pointInside(geometry, point);
-
 exports.closestPoint = (geometry) => (point) =>
   geom.closestPoint(geometry, point, []);
 
-exports.bounds = (shape) => fromAABBLike(geom.bounds(shape));
-
 // Transform related stuff
-exports.translate = (amount) => (geometry) =>
-  geom.translate(geometry, [...amount, 0]);
-
 exports.transform =
   (/** @type Transform */ matrix) => (/** @type Geometry */ geometry) =>
     geom.transform(geometry, matrix);

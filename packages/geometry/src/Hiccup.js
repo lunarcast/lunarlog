@@ -3,47 +3,54 @@ const geom = require("@thi.ng/geom");
 
 const _type = "purescript";
 
-exports.buildGeometryBlueprint = ({ toHiccup, aabbLike, translate }) => {
-  class Internal {
-    constructor(attribs) {
-      this.attribs = attribs;
+exports.buildGeometryBlueprintImpl =
+  (name) =>
+  ({ toHiccup, bounds, pointInside, translate }) => {
+    const Internal = {
+      [name]: class {
+        constructor(attribs) {
+          this.attribs = attribs;
+        }
 
-      if (aabbLike) {
-        const aabb = aabbLike(attribs)();
+        get type() {
+          return _type;
+        }
 
-        this.bounds = { pos: aabb.position, size: aabb.size };
-        this.aabb = new geom.Rect(aabb.position, aabb.size);
-      }
-    }
+        translate(amount) {
+          const newAttribs = translate(amount)(this.attribs);
 
-    get type() {
-      return _type;
-    }
+          return new Internal(newAttribs);
+        }
 
-    translate(amount) {
-      const newAttribs = translate(amount)(this.attribs);
+        pointInside(point) {
+          return pointInside(point)(this.attribs);
+        }
 
-      return new Internal(newAttribs);
-    }
+        bounds() {
+          return bounds(this.attribs);
+        }
 
-    pointInside(point) {
-      if (aabbLike) return geom.pointInside(this.aabb, point);
+        copy() {
+          return new Internal(this.attribs);
+        }
 
-      return false;
-    }
+        toHiccup() {
+          return toHiccup(this.attribs);
+        }
+      },
+    }[name];
 
-    copy() {
-      return new Internal(this.attribs);
-    }
-
-    toHiccup() {
-      return toHiccup(this.attribs);
-    }
-  }
-
-  return (s) => new Internal(s);
-};
+    return (s) => new Internal(s);
+  };
 
 geom.translate.add(_type, (geometry, amount) => geometry.translate(amount));
-geom.bounds.add(_type, (shape) => shape.bounds);
+geom.bounds.add(_type, (shape) => shape.bounds(shape));
 geom.pointInside.add(_type, (shape, point) => shape.pointInside(point));
+
+exports.pointInsideGeometry = (vec) => (geometry) =>
+  geom.pointInside(geometry, vec);
+
+exports.toHiccupGeometry = (geometry) => geometry.toHiccup();
+exports.boundsGeometry = (geometry) => geom.bounds(geometry);
+exports.translateGeometry = (amount) => (geometry) =>
+  geom.translate(geometry, amount);

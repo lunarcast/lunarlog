@@ -8,8 +8,9 @@ import Data.Undefined.NoProblem as Opt
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
-import Geometry.Base (CanvasMouseEvent, ClickCheck(..), Geometry, attributes, children, isClicked, render)
+import Geometry.Base (CanvasMouseEvent, ClickCheck(..), Geometry, attributes, children, render)
 import Geometry.Base as Geometry
+import Geometry.Hiccup (isClicked)
 import Graphics.Canvas (Context2D, clearRect)
 import Loglude.Cancelable as Cancelable
 import Web.Event.Event (EventType)

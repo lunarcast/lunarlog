@@ -4,46 +4,41 @@ module Geometry.Shapes.Text
 
 import Loglude
 
-import Data.Lens (Lens', over)
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
-import Data.Newtype (class Newtype)
-import Geometry.Base (type (<+>), FullGeometryConstructor, Geometry, OptionalTextAttributes, TextAttributes)
-import Geometry.Hiccup (HiccupConfig, buildGeometryBlueprint)
-import Geometry.Vector (Vec2)
-import Graphics.Canvas (Context2D, measureText, restore, save, setFont)
+import Geometry.Base (type (<+>), AllAttributes, FullGeometryConstructor, Geometry, OptionalTextAttributes, TextAttributes)
+import Geometry.Hiccup (class Hiccup, class IsAABB, buildGeometryBlueprint, pointInsideAABB, toAABB, translateByLens)
+import Graphics.Canvas (Context2D)
 import Loglude.UntypedArray (UntypedArray)
 
 newtype CustomTextAttributes a = CustomTextAttributes
-    (Record ((TextAttributes <+> OptionalTextAttributes) () a))
-
-textConfig :: Ask Context2D => HiccupConfig CustomTextAttributes
-textConfig =
-    { toHiccup: textToHiccup
-    , aabbLike: opt aabb
-    , translate:  (+) >>> over _position
-    }
-    where
-    aabb (CustomTextAttributes this) = ado
-        save ask
-        setFont ask this.font
-        metrics <- unsafeCoerce <$> measureText ask this.text 
-        restore ask
-        in { position: this.position
-           , size: vec2 metrics.width (metrics.fontBoundingBoxAscent)
-           }
+    (AllAttributes (TextAttributes <+> OptionalTextAttributes) a)
 
 _text :: forall a. Ask Context2D => CustomTextAttributes a -> Geometry a
-_text = buildGeometryBlueprint textConfig
+_text = buildGeometryBlueprint "Text"
 
 text :: forall a. Ask Context2D => FullGeometryConstructor OptionalTextAttributes TextAttributes a
 text = unsafeCoerce _text
 
-foreign import textToHiccup :: forall a. CustomTextAttributes a -> UntypedArray
-
 ---------- Typeclass instances
+instance Ask Context2D => Hiccup CustomTextAttributes where
+    translate = translateByLens (_Newtype <<< prop (Proxy :: _ "position"))
+    pointInside = pointInsideAABB
+    toHiccup = textToHiccup
+    bounds = toAABB
+
+instance Ask Context2D => IsAABB CustomTextAttributes where
+    toAABB (CustomTextAttributes this) = do
+        let metrics = measureText ask this.font this.text 
+        { position: this.position
+        , size: vec2 metrics.width (metrics.fontBoundingBoxAscent)
+        }
+
 derive instance Newtype (CustomTextAttributes a) _
 
----------- Lenses
-_position :: forall a. Lens' (CustomTextAttributes a) Vec2
-_position = _Newtype <<< prop (Proxy :: _ "position")
+---------- Foreign imports
+type TextMetrics = 
+    { width :: Number
+    , fontBoundingBoxAscent :: Number
+    }
+
+foreign import textToHiccup :: forall a. CustomTextAttributes a -> UntypedArray
+foreign import measureText :: Context2D -> String -> String -> TextMetrics

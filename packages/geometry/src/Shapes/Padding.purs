@@ -10,7 +10,8 @@ module Geometry.Shapes.Padding
 import Loglude
 
 import Data.Vec as Vec
-import Geometry.Base (type (<+>), Attributes, FullGeometryConstructor, GenericGeometryAttributes, Geometry, GeometryAttributes, AllAttributes, bounds, group, rect, translate)
+import Geometry.Base (type (<+>), Attributes, FullGeometryConstructor, GenericGeometryAttributes, Geometry, GeometryAttributes, AllAttributes, group, rect)
+import Geometry.Hiccup (bounds, translate)
 import Geometry.Vector (Vec2)
 import Record as Record
 import Record.Unsafe.Union (unsafeUnion)

@@ -2,27 +2,29 @@ module Geometry.Shapes.None (none) where
 
 import Loglude
 
-import Geometry.Vector (Vec2)
 import Geometry.Base (Geometry)
-import Geometry.Hiccup (HiccupConfig, buildGeometryBlueprint)
+import Geometry.Hiccup (class Hiccup, class IsAABB, buildGeometryBlueprint, pointInsideAABB, toAABB, translateByLens)
+import Geometry.Vector (Vec2)
 import Loglude.UntypedArray as UntypedArray
 
 newtype None :: Type -> Type
 newtype None a = None { position :: Vec2 }
 
-noneConfig :: HiccupConfig None
-noneConfig = 
-    { translate: (+) >>> over _position
-    , toHiccup: const $ UntypedArray.nil
-    , aabbLike: opt \(None { position }) -> pure { position, size: zero }
-    }
-
 none :: forall a. Vec2 -> Geometry a
-none position = buildGeometryBlueprint noneConfig (None { position })
+none position = buildGeometryBlueprint "None" (None { position })
+
+--------- Typeclass instances
+derive instance Newtype (None a) _
+
+instance Hiccup None where
+    translate = translateByLens _position
+    toHiccup = const UntypedArray.nil
+    bounds = toAABB
+    pointInside = pointInsideAABB
+
+instance IsAABB None where
+    toAABB (None { position }) = { position, size: zero } 
 
 ---------- Lenses
 _position :: forall a. Lens' (None a) Vec2
 _position = _Newtype <<< prop (Proxy :: _ "position")
-
---------- Typeclass instances
-derive instance Newtype (None a) _

@@ -25,17 +25,13 @@ module Geometry.Base
     , rect
     , circle
     , rawText
-    , isClicked
     , distanceToShape
     , distanceToShapeSquared
     , render
     , attributes
     , allAttributes
     , children
-    , pointInside
     , closestPoint
-    , bounds
-    , translate
     , transform
     , transformVertices
     , type (<+>)) where
@@ -139,11 +135,6 @@ rawText :: forall a. FullGeometryConstructor OptionalTextAttributes TextAttribut
 rawText = unsafeCoerce _text
 
 ---------- Heleprs
-isClicked :: forall a. ClickCheck -> CanvasMouseEvent -> Geometry a -> Boolean
-isClicked MouseInside { position } geometry = pointInside geometry position
-isClicked (MouseCloserThan amount) event geometry = 
-    isClicked MouseInside event geometry || distanceToShape geometry event.position < amount
-
 distanceToShape :: forall a. Geometry a -> Vec2 -> Number
 distanceToShape geometry point = distance point (closestPoint geometry point)
 
@@ -164,10 +155,7 @@ foreign import _text :: forall a. ForeignGeometryConstructor
 foreign import render :: forall a. Context2D -> Geometry a -> Effect Unit
 foreign import attributes :: forall a. Geometry a -> Record (IncompleteGeometryAttributes a)
 foreign import children :: forall a. Geometry a -> Array (Geometry a)
-foreign import pointInside :: forall a. Geometry a -> Vec2 -> Boolean
 foreign import closestPoint :: forall a. Geometry a -> Vec2 -> Vec2
-foreign import bounds :: forall a. Geometry a -> Record (AABBLike ())
 
-foreign import translate :: forall a. Vec2 -> Geometry a -> Geometry a
 foreign import transform :: forall a. TransformMatrix -> Geometry a -> Geometry a
 foreign import transformVertices :: forall a. (Vec2 -> Vec2) -> Geometry a -> Geometry a
