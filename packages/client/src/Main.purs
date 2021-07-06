@@ -28,7 +28,7 @@ myPattern =
     }
 
 myVisualPattern :: VisualGraph.Pattern
-myVisualPattern = { position: vec2 100.0 200.0, width: 100.0 }
+myVisualPattern = { position: vec2 100.0 200.0 }
 
 data MyAction = Clicked String
 
@@ -101,7 +101,7 @@ scene context = { context, initialState: unit, render, handleAction, setup }
 
         a = Geometry.text { text: "Something", onClick: const $ Clicked "something", font: "30px Arial", position: zero, stroke: "black" } 
         b = Geometry.text { text: "Short", position: zero, fill: "black" } 
-        c = Geometry.text { text: "Long name!", font: "20px Source Code Pro", position: zero, fill: "black" } 
+        c = Geometry.text { text: "Long text!", font: "20px Source Code Pro", position: zero, fill: "black" } 
 
 main :: Effect Unit
 main = do

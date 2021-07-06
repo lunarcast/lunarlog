@@ -10,14 +10,9 @@ import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph as NodeGraph
 
 renderPattern :: forall a. Ask Context2D => VisualGraph.Pattern -> NodeGraph.Pattern -> Geometry a
-renderPattern { position, width } { name } = Geometry.group
+renderPattern { position } { name } = Geometry.group
     { children: 
-        [ Geometry.rect 
-            { position
-            , size: vec2 width 100.0
-            , fill: "blue"
-            }
-        , Geometry.aabbPadding
+        [ Geometry.aabbPadding
             { target: Geometry.text
                 { position
                 , text: name 

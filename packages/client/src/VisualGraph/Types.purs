@@ -6,8 +6,7 @@ import Geometry.Vector (Vec2)
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 
 type Pattern =
-    { position :: Vec2
-    , width :: Number }
+    { position :: Vec2 }
 
 data Node
    = PatternNode Pattern

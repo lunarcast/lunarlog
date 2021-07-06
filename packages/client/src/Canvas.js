@@ -1,5 +1,6 @@
 exports.fixDpi = (/** @type CanvasRenderingContext2d */ context) => () => {
-  const dpi = Math.ceil(window.devicePixelRatio);
+  // const dpi = Math.ceil(window.devicePixelRatio);
+  const dpi = 1;
 
   const clientRect = context.canvas.getBoundingClientRect();
 
