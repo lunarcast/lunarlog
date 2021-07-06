@@ -4,6 +4,7 @@ module Geometry.Shapes.Padding
     , aabbPadding
     , equalPadding
     , xyPadding
+    , fourWayPadding
     ) where
 
 import Loglude
@@ -31,6 +32,9 @@ equalPadding = Vec.replicate d4
 
 xyPadding :: Vec2 -> Padding
 xyPadding a = a `Vec.concat` a
+
+fourWayPadding :: Number -> Number -> Number -> Number -> Padding
+fourWayPadding a b c d = Vec.cons a $ Vec.cons b $ Vec.cons c $ Vec.cons d Vec.empty
 
 defaults :: forall a. AllAttributes OptionalPaddingAttributes a
 defaults = { paddingPlacement: FixedCorner }

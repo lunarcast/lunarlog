@@ -10,7 +10,7 @@ import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Geometry.Base (type (<+>), FullGeometryConstructor, Geometry, OptionalTextAttributes, TextAttributes)
 import Geometry.Hiccup (HiccupConfig, buildGeometryBlueprint)
-import Geometry.Vector (Vec2, x, y)
+import Geometry.Vector (Vec2)
 import Graphics.Canvas (Context2D, measureText, restore, save, setFont)
 import Loglude.UntypedArray (UntypedArray)
 
@@ -29,8 +29,8 @@ textConfig =
         setFont ask this.font
         metrics <- unsafeCoerce <$> measureText ask this.text 
         restore ask
-        in { position: vec2 (x this.position) (y this.position - metrics.fontBoundingBoxAscent)
-           , size: vec2 metrics.width (metrics.fontBoundingBoxDescent + metrics.fontBoundingBoxAscent)
+        in { position: this.position
+           , size: vec2 metrics.width (metrics.fontBoundingBoxAscent)
            }
 
 _text :: forall a. Ask Context2D => CustomTextAttributes a -> Geometry a

@@ -25,7 +25,6 @@ module Geometry.Base
     , rect
     , circle
     , rawText
-    , none
     , isClicked
     , distanceToShape
     , distanceToShapeSquared
@@ -60,6 +59,7 @@ type GenericGeometryAttributes :: forall k. (Type -> k) -> Type -> Row k
 type GenericGeometryAttributes f action = 
     ( fill :: f String
     , stroke :: f String
+    , weight :: f Number
     , alpha :: f Number
     , clickChecker :: f ClickCheck
     , onClick :: f (CanvasMouseEvent -> action) 
@@ -103,7 +103,7 @@ type RectAttributes :: Attributes
 type RectAttributes r a = AABBLike r
 
 type CircleAttributes :: Attributes
-type CircleAttributes r a = ( position :: Vec2, radius :: Int | r )
+type CircleAttributes r a = ( position :: Vec2, radius :: Number | r )
 
 type GroupAttributes :: Attributes
 type GroupAttributes r a = ( children :: Array (Geometry a) | r )
@@ -137,9 +137,6 @@ circle = unsafeCoerce _circle
 
 rawText :: forall a. FullGeometryConstructor OptionalTextAttributes TextAttributes a
 rawText = unsafeCoerce _text
-
-none :: forall a. Geometry a 
-none = group { children: [] }
 
 ---------- Heleprs
 isClicked :: forall a. ClickCheck -> CanvasMouseEvent -> Geometry a -> Boolean

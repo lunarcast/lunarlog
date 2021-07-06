@@ -23,7 +23,6 @@ module Geometry.Vector
 
 import Loglude
 
-import Data.Lens (Lens', lens, over)
 import Data.Typelevel.Num (class Lt, class Nat)
 import Data.Vec ((!!))
 import Data.Vec as Vec
