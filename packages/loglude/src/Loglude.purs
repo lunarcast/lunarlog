@@ -33,14 +33,27 @@ module Loglude
     , module Data.Foldable
     , module Data.Generic.Rep
     , module Data.Show.Generic
+    , module Data.Lens
+    , module Data.Lens.Record
+    , module Data.Lens.Lens.Tuple
+    , module Data.Lens.Iso.Newtype
+    , module Data.Newtype
     , module Data.Tuple.Nested ) where
 
 import Prelude
 
+import Data.Newtype (class Newtype)
+import Data.Lens.Lens.Tuple (_1, _2)
 import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Foldable (class Foldable, foldr, foldl, foldMap, sum)
+import Data.Generic.Rep (class Generic)
 import Data.HashMap (HashMap)
 import Data.Int (floor, toNumber)
+import Data.Lens (Lens', over, set, preview, view, lens)
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe, maybe, maybe')
+import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
 import Data.Traversable (class Traversable, traverse_, traverse)
 import Data.Tuple (Tuple(..), curry, uncurry, swap, fst, snd)
@@ -68,7 +81,3 @@ import Web.HTML (window)
 import Web.HTML.HTMLDocument (body)
 import Web.HTML.Window (document)
 import Web.UIEvent.MouseEvent (MouseEvent)
-
-import Data.Foldable (class Foldable, foldr, foldl, foldMap, sum)
-import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
