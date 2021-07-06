@@ -1,1 +1,2 @@
-./packages/client/spago.dhall // { sources = [ "./packages/*/src/**/*.purs" ] }
+    ./packages/client/spago.dhall
+//  { sources = [ "./packages/client/src/**/*.purs" ] }
