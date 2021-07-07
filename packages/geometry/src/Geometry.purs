@@ -14,7 +14,7 @@ module Geometry
 
 import Geometry.Base
 
-import Geometry.Hiccup (class GeometryWrapper, class Hiccup, class IsAABB, bounds, buildGeometryBlueprint, isClicked, pointInside, pointInsideAABB, toAABB, toHiccup, translate, translateByLens, unwrapGeometry)
+import Geometry.Hiccup (class GeometryWrapper, class Hiccup, class IsAABB, bounds, buildGeometryBlueprint, pointInside, pointInsideAABB, toAABB, toHiccup, translate, translateByLens, unwrapGeometry)
 import Geometry.Shapes.None (none)
 import Geometry.Shapes.Transformed (Transformed(..), transformed)
 import Geometry.Shapes.Padding (Padding, PaddingPlacement, aabbPadding, equalPadding, fourWayPadding, xyPadding)

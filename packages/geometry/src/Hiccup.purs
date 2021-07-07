@@ -11,12 +11,11 @@ module Geometry.Hiccup
     , pointInsideAABB
     , buildGeometryBlueprint
     , translateByLens
-    , isClicked
     ) where
 
 import Loglude
 
-import Geometry.Base (AABB, CanvasMouseEvent, ClickCheck(..), Geometry, distanceToShape, rect)
+import Geometry.Base (AABB, Geometry, rect)
 import Geometry.Vector (Vec2)
 import Loglude.UntypedArray (UntypedArray)
 
@@ -52,12 +51,6 @@ instance Hiccup Geometry where
 
 instance GeometryWrapper Geometry where
     unwrapGeometry = identity
-
----------- Heleprs
-isClicked :: forall a. ClickCheck -> CanvasMouseEvent -> Geometry a -> Boolean
-isClicked MouseInside { position } geometry = pointInside position geometry
-isClicked (MouseCloserThan amount) event geometry = 
-    isClicked MouseInside event geometry || distanceToShape geometry event.position < amount
     
 ---------- Foreign imports
 newtype WithHiccupDict f a = WithHiccupDict (Hiccup f => a)

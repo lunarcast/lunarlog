@@ -11,7 +11,7 @@ import Geometry.Base (type (<+>), AllAttributes, Attributes, FullGeometryConstru
 import Geometry.Base as Geometry
 import Geometry.Hiccup (class GeometryWrapper, class Hiccup, bounds, buildGeometryBlueprint, pointInside, toHiccup)
 import Geometry.Hiccup as Hiccup
-import Geometry.Transform (TransformMatrix, multiplyVector, translate)
+import Geometry.Transform (TransformMatrix, inverse, multiplyVector, translate)
 import Record.Unsafe.Union (unsafeUnion)
 
 type TransformedAttributes :: Attributes
@@ -41,7 +41,10 @@ transformed = flip unsafeUnion defaults >>> unsafeCoerce transformed_
 ---------- Typeclass instances
 instance Hiccup Transformed where
     toHiccup (Transformed { transform, target }) = toHiccup $ Geometry.group { transform, children: [target] }
-    pointInside point (Transformed { transform, target }) = pointInside (multiplyVector transform point) target
+    pointInside point (Transformed { transform, target }) = pointInside (multiplyVector inversed point) target
+        where
+        -- TODO: cache this
+        inversed = inverse transform
     translate amount shape 
         | view _transformBounds shape = over _transform (_ <> translate amount) shape
         | otherwise = over _target (Hiccup.translate amount) shape

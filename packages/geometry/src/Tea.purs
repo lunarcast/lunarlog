@@ -4,13 +4,14 @@ import Loglude
 
 import Control.Monad.State (StateT, execStateT)
 import Data.Array as Array
+import Data.Foldable (for_)
 import Data.Undefined.NoProblem as Opt
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
-import Geometry.Base (CanvasMouseEvent, ClickCheck(..), Geometry, attributes, children, render)
+import Geometry.Base (CanvasMouseEvent, Geometry, attributes, children, render)
 import Geometry.Base as Geometry
-import Geometry.Hiccup (isClicked)
+import Geometry.Hiccup (pointInside)
 import Graphics.Canvas (Context2D, clearRect)
 import Loglude.Cancelable as Cancelable
 import Web.Event.Event (EventType)
@@ -19,6 +20,7 @@ import Web.HTML.Event.EventTypes as EventType
 import Web.HTML.HTMLElement as HtmlElement
 import Web.UIEvent.MouseEvent as MouseEvent
 
+---------- Types
 type SetupArgs :: Type -> Type -> Type
 type SetupArgs s a = { propagateAction :: a -> Effect Unit }
 
@@ -29,12 +31,14 @@ type Tea s a =
     , context :: Context2D
     , setup :: SetupArgs s a -> Cancelable Unit }
 
+
 data CanvasEvent
     = Click CanvasMouseEvent
     | MouseDown CanvasMouseEvent
     | MouseUp CanvasMouseEvent
     | MouseMove CanvasMouseEvent
 
+---------- Implementations
 launchTea :: forall state action. Tea state action -> Cancelable Unit
 launchTea tea = do
     dirty <- liftEffect $ Ref.new true
@@ -74,17 +78,14 @@ launchTea tea = do
                 }
 
             check geom = case Opt.toMaybe attribs.onClick of
-                Just handler | isClicked checkMode event geom -> Just $ handler event
+                Just handler | pointInside event.position geom -> Just $ handler event
                 _ -> Nothing
                 where
-                checkMode = Opt.fromOpt MouseInside attribs.clickChecker 
                 attribs = attributes geom 
 
-            actions =  dispatchEvent check currentGeometry
+            actions = dispatchEvent check currentGeometry
 
-        case Array.head actions of
-            Just first -> propagateAction first
-            Nothing -> pure unit
+        for_ actions propagateAction
 
     tea.setup { propagateAction }
     where
@@ -102,12 +103,11 @@ We want event handlers to be able to:
 -}
 
 dispatchEvent :: forall a. (Geometry a -> Maybe a) -> Geometry a -> Array a
-dispatchEvent check geometry = case check geometry of
-    Just action -> nested <> [action]
-    Nothing -> nested 
+dispatchEvent check geometry = Array.catMaybes [Array.last nested, current]
     where
+    current = check geometry
     nested = next >>= \child -> dispatchEvent check child
-    next = Array.reverse $ children geometry
+    next = children geometry
 
 eventStream :: forall e. (Event -> Maybe e) -> EventType -> Stream.Discrete e 
 eventStream fromEvent eventType = Cancelable.createStream \emit -> do
@@ -115,4 +115,3 @@ eventStream fromEvent eventType = Cancelable.createStream \emit -> do
         listener <- liftEffect $ eventListener 
             $ fromEvent >>> traverse_ emit
         Cancelable.addEventListener eventType listener false (HtmlElement.toEventTarget body_)
-
