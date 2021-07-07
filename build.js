@@ -12,5 +12,6 @@ esbuild
     outdir: "dist",
     watch: true,
     plugins: [PurescriptPlugin(), sassPlugin()],
+    sourcemap: "both",
   })
   .catch((_e) => process.exit(1));
