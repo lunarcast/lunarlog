@@ -9,12 +9,14 @@ module Geometry
     , module Geometry.Shapes.Padding
     , module Graphics.Canvas
     , module Geometry.Shapes.None
+    , module Geometry.Shapes.Transformed
     ) where
 
 import Geometry.Base
 
 import Geometry.Hiccup (class GeometryWrapper, class Hiccup, class IsAABB, bounds, buildGeometryBlueprint, isClicked, pointInside, pointInsideAABB, toAABB, toHiccup, translate, translateByLens, unwrapGeometry)
 import Geometry.Shapes.None (none)
+import Geometry.Shapes.Transformed (Transformed(..), transformed_, transformed)
 import Geometry.Shapes.Padding (Padding, PaddingPlacement, aabbPadding, equalPadding, fourWayPadding, xyPadding)
 import Geometry.Shapes.Text (CustomTextAttributes, text)
 import Geometry.Tea (SetupArgs, Tea, launchTea)

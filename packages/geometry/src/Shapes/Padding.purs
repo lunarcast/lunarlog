@@ -49,6 +49,7 @@ _aabbPadding attributes = process $ group
             } 
         , attributes.target
         ]
+    , label: "Padding container"
     }
     where
     { position, size } = bounds attributes.target

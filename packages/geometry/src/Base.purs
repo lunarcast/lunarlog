@@ -59,6 +59,9 @@ type GenericGeometryAttributes f action =
     , alpha :: f Number
     , clickChecker :: f ClickCheck
     , onClick :: f (CanvasMouseEvent -> action) 
+
+    -- Here for debugging only (rn)
+    , label :: f String
     )
 
 type GeometryAttributes a = GenericGeometryAttributes Id a

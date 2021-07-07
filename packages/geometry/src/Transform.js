@@ -13,15 +13,9 @@ exports.rotateAround = (point) => (angle) => {
   const translation = exports.translate(point.map((x) => -x));
   const rotation = exports.rotate(angle);
 
-  // Separate var so we dont depend on argument evaluation order
   const translateThenRotate = exports.composeMatrices(translation)(rotation);
-  const goBack = matrices.mulV23([], exports.rotate(Math.PI), point);
 
-  console.log({ translation, rotation, translateThenRotate, goBack });
-
-  return exports.composeMatrices(translateThenRotate)(
-    exports.translate([point[0], point[1]])
-  );
+  return exports.composeMatrices(translateThenRotate)(exports.translate(point));
 };
 
 exports.scaleXY = exports.scale;

@@ -121,6 +121,7 @@ _createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretc
     stackFixed :: Vec2 -> Geometry a
     stackFixed fixedSize = group
         { children: processShapes $ Array.scanl scanner (startingOffset /\ none zero) childrenWithFixedSizes <#> snd
+        , label: "Flex container"
         }
         where
         processShapes :: Array (Geometry a) -> Array (Geometry a)

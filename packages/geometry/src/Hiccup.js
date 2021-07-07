@@ -3,6 +3,9 @@ const geom = require("@thi.ng/geom");
 
 const _type = "purescript";
 
+const aabbToForeign = ({ position, size }) => ({ pos: position, size });
+const aabbFromForeign = ({ pos, size }) => ({ position: pos, size });
+
 exports.buildGeometryBlueprintImpl =
   (name) =>
   ({ toHiccup, bounds, pointInside, translate }) => {
@@ -27,7 +30,7 @@ exports.buildGeometryBlueprintImpl =
         }
 
         bounds() {
-          return bounds(this.attribs);
+          return aabbToForeign(bounds(this.attribs));
         }
 
         copy() {
@@ -44,13 +47,13 @@ exports.buildGeometryBlueprintImpl =
   };
 
 geom.translate.add(_type, (geometry, amount) => geometry.translate(amount));
-geom.bounds.add(_type, (shape) => shape.bounds(shape));
+geom.bounds.add(_type, (shape) => shape.bounds());
 geom.pointInside.add(_type, (shape, point) => shape.pointInside(point));
 
 exports.pointInsideGeometry = (vec) => (geometry) =>
   geom.pointInside(geometry, vec);
 
 exports.toHiccupGeometry = (geometry) => geometry.toHiccup();
-exports.boundsGeometry = (geometry) => geom.bounds(geometry);
+exports.boundsGeometry = (geometry) => aabbFromForeign(geom.bounds(geometry));
 exports.translateGeometry = (amount) => (geometry) =>
   geom.translate(geometry, amount);
