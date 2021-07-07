@@ -18,6 +18,7 @@
   , "type-equality"
   , "web-html"
   , "profunctor-lenses"
+  , "run"
   ]
 , packages = ../../packages.dhall
 , sources = [ "src/**/*.purs" ]
