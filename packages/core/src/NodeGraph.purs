@@ -2,6 +2,7 @@ module Lunarlog.Core.NodeGraph where
 
 import Loglude
 
+
 newtype NodeId = NodeId Int
 newtype PinId = PinId Int
 
@@ -43,3 +44,7 @@ data Declaration
 type Module =
     { name :: Array String
     , declarations :: Array Declaration }
+
+---------- Typeclass instances
+derive newtype instance Show PinId
+derive newtype instance Show NodeId
