@@ -21,6 +21,9 @@ module Geometry.Base
     , OptionalTextAttributes
     , CanvasMouseEvent
     , AllAttributes
+    , WithGeometryAttributes
+    , WithIncompleteGeometryAttributes
+    , GenericEventAttributes
     , group
     , rect
     , circle
@@ -51,18 +54,20 @@ data ClickCheck
     = MouseInside
     | MouseCloserThan Number
 
-type GenericGeometryAttributes :: forall k. (Type -> k) -> Type -> Row k
-type GenericGeometryAttributes f action = 
+type GenericEventAttributes :: (Type -> Type) -> Attributes
+type GenericEventAttributes f r action =
+    ( onClick :: f (CanvasMouseEvent -> action) 
+    | r )
+
+type GenericGeometryAttributes :: (Type -> Type) -> Type -> Row Type
+type GenericGeometryAttributes f action =
     ( fill :: f String
     , stroke :: f String
     , weight :: f Number
     , alpha :: f Number
-    , clickChecker :: f ClickCheck
-    , onClick :: f (CanvasMouseEvent -> action) 
-
     -- Here for debugging only (rn)
     , label :: f String
-    )
+    | GenericEventAttributes f () action )
 
 type GeometryAttributes a = GenericGeometryAttributes Id a
 type IncompleteGeometryAttributes a = GenericGeometryAttributes Opt a
@@ -92,6 +97,12 @@ type Attributes = Row Type -> Type -> Row Type
 
 type AllAttributes :: Attributes -> Type -> Type
 type AllAttributes attrs a = Record (attrs () a)
+
+type WithGeometryAttributes :: Attributes -> Type -> Type
+type WithGeometryAttributes attrs a = Record (attrs (GeometryAttributes a) a)
+
+type WithIncompleteGeometryAttributes :: Attributes -> Type -> Type
+type WithIncompleteGeometryAttributes attrs a = Record (attrs (IncompleteGeometryAttributes a) a)
 
 type ComposeAttributes :: Attributes -> Attributes -> Attributes
 type ComposeAttributes n m r a = n (m r a) a

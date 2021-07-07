@@ -1,6 +1,4 @@
-const { add2 } = require("@thi.ng/vectors");
 const geom = require("@thi.ng/geom");
-
 const _type = "purescript";
 
 const aabbToForeign = ({ position, size }) => ({ pos: position, size });
@@ -49,6 +47,16 @@ exports.buildGeometryBlueprintImpl =
 geom.translate.add(_type, (geometry, amount) => geometry.translate(amount));
 geom.bounds.add(_type, (shape) => shape.bounds());
 geom.pointInside.add(_type, (shape, point) => shape.pointInside(point));
+
+/* 
+/** @type { import("@thi.ng/defmulti").MultiFn<import("@thi.ng/geom-api").IShape> } *\/
+const isClicked = multi.defmulti2((x) => x.type);
+
+isClicked.add(multi.DEFAULT, (x) => geom.pointInside(point, x))
+
+isClicked.addAll({
+  group: ($) => $.children.some((child) => isClicked(child)),
+}); */
 
 exports.pointInsideGeometry = (vec) => (geometry) =>
   geom.pointInside(geometry, vec);

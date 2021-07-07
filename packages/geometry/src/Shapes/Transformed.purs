@@ -1,30 +1,42 @@
-module Geometry.Shapes.Transformed (Transformed(..), transformed, visuallyTransformed, transformed_) where
+module Geometry.Shapes.Transformed 
+    ( Transformed(..)
+    , TransformedAttributes
+    , OptionalTransformedAttributes
+    , transformed
+    ) where
 
 import Loglude
 
-import Debug (spy)
-import Geometry.Base (Geometry)
+import Geometry.Base (type (<+>), AllAttributes, Attributes, FullGeometryConstructor, GenericEventAttributes, Geometry)
 import Geometry.Base as Geometry
 import Geometry.Hiccup (class GeometryWrapper, class Hiccup, bounds, buildGeometryBlueprint, pointInside, toHiccup)
 import Geometry.Hiccup as Hiccup
 import Geometry.Transform (TransformMatrix, multiplyVector, translate)
+import Record.Unsafe.Union (unsafeUnion)
+
+type TransformedAttributes :: Attributes
+type TransformedAttributes r a =
+    ( transform :: TransformMatrix
+    , target :: Geometry a
+    | r )
+
+type OptionalTransformedAttributes :: Attributes
+type OptionalTransformedAttributes r a =
+    ( transformBounds :: Boolean | r )
 
 -- | Attributes for the transformed 
-newtype Transformed a = Transformed
-    { transform :: TransformMatrix
-    , target :: Geometry a
-    , transformBounds :: Boolean
-    }
+newtype Transformed a = Transformed 
+    (AllAttributes (TransformedAttributes <+> OptionalTransformedAttributes <+> GenericEventAttributes Opt) a)
     
 transformed_ :: Transformed ~> Geometry
 transformed_ = buildGeometryBlueprint "Transformed"
 
-transformed :: TransformMatrix -> Geometry ~> Geometry
-transformed transform target = transformed_ $ Transformed { transform, target, transformBounds: true }
+defaults :: forall a. AllAttributes OptionalTransformedAttributes a
+defaults = 
+    { transformBounds: true }
 
--- | Does not affect the bounds of the element. Useful for offseting something inside padding.
-visuallyTransformed :: TransformMatrix -> Geometry ~> Geometry
-visuallyTransformed transform target = transformed_ $ Transformed { transform, target, transformBounds: false }
+transformed :: forall a. FullGeometryConstructor OptionalTransformedAttributes TransformedAttributes a
+transformed = flip unsafeUnion defaults >>> unsafeCoerce transformed_ 
 
 ---------- Typeclass instances
 instance Hiccup Transformed where
