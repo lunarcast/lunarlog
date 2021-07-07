@@ -10,9 +10,10 @@ import Geometry.TextBaseline as TextBaseline
 import Geometry.Transform as Transform
 import Graphics.Canvas (Context2D)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
-import Lunarlog.Core.NodeGraph (PatternArgument(..))
+import Lunarlog.Core.NodeGraph (PatternArgument(..), PinId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
 
+---------- Constants
 patternBackground :: String
 patternBackground = "#272345"
 
@@ -34,7 +35,13 @@ patternPadding = 30.0
 pinRadius :: Number
 pinRadius = 15.0
 
-renderPattern :: forall a. Ask Context2D => Maybe (VisualGraph.Pattern) -> NodeGraph.Pattern -> Number -> FlexLayout a
+---------- Types
+data PatternAction = ClickedPin PinId
+
+data PinSide = LeftPin | RightPin
+
+---------- Implementation
+renderPattern :: Ask Context2D => Maybe (VisualGraph.Pattern) -> NodeGraph.Pattern -> Number -> FlexLayout PatternAction
 renderPattern maybePosition { name, arguments } offset = Flex.createFlexLayout
     { position: maybe zero _.position maybePosition
     , flexAxis: Y
@@ -45,6 +52,7 @@ renderPattern maybePosition { name, arguments } offset = Flex.createFlexLayout
             , amount: Geometry.fourWayPadding patternPadding 10.0 0.0 $ maybe 0.0 (const 20.0) maybePosition
             , fill: patternBackground 
             , stroke: patternStrokeColor
+            , onClick: const $ ClickedPin $ PinId 0
             }
     , children: 
         [ Flex.IsLayout $ Flex.createFlexLayout
@@ -65,28 +73,26 @@ renderPattern maybePosition { name, arguments } offset = Flex.createFlexLayout
     }
     where
     argumentGeometries = arguments <#> case _ of
-        Pin _ -> Flex.IsLayout $ Flex.createFlexLayout
+        Pin id -> Flex.IsLayout $ Flex.createFlexLayout
             { flexAxis: X
             , arrangeChildren: Flex.SpaceBetween
-            , children: [ Flex.NotLayout $ pin LeftPin $ -offset, Flex.NotLayout $ pin RightPin 0.0 ]
+            , children: [ Flex.NotLayout $ pin id LeftPin $ -offset, Flex.NotLayout $ pin id RightPin 0.0 ]
             }  
         NestedPattern pattern -> Flex.IsLayout $ renderPattern Nothing pattern $ offset + patternPadding
 
-data PinSide = LeftPin | RightPin
-
-pin :: forall t. PinSide -> Number -> Geometry t
-pin side extraOffset = Geometry.group 
-    { children: 
-        [ Geometry.aabbPadding 
-            { target: Geometry.circle
-                { radius: pinRadius
-                , position: zero
-                , fill: pinColor 
-                }
-            , amount: Geometry.fourWayPadding 0.0 10.0 0.0 10.0
+pin :: PinId -> PinSide -> Number -> Geometry PatternAction
+pin id side extraOffset = Geometry.transformed_ $ Geometry.Transformed 
+    { target: Geometry.aabbPadding 
+        { target: Geometry.circle
+            { radius: pinRadius
+            , position: zero
+            , fill: pinColor 
+            , onClick: const $ ClickedPin id
             }
-        ]
+        , amount: Geometry.fourWayPadding 0.0 10.0 0.0 10.0
+        }
     , transform: Transform.translate (vec2 offset 0.0)
+    , transformBounds: false
     }
     where
     offset = extraOffset + case side of
