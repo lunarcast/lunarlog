@@ -1,15 +1,16 @@
 module Loglude.ReactiveRef 
     ( ReactiveRef(..)
+    , ReadableRef
     , WriteableRef
     , read
     , write
+    , modify
     , changes
     , writeable
     , fromStream ) where
 
 import Prelude
 
-import Control.Plus (empty)
 import Data.Lens (Lens', view)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -22,20 +23,26 @@ import Loglude.Cancelable (Cancelable)
 import Loglude.Cancelable as Cancelable
 import Type.Proxy (Proxy(..))
 
-newtype ReactiveRef a = ReactiveRef { read :: Effect a, changes :: Stream.Discrete a }
+newtype ReactiveRef r a = ReactiveRef { read :: Effect a, changes :: Stream.Discrete a | r }
 
-type WriteableRef a =
-    { ref :: ReactiveRef a
-    , write :: a -> Effect Unit
-    }
+type ReadableRef = ReactiveRef ()
+type WriteableRef a = ReactiveRef ( write :: a -> Effect Unit ) a
 
-read :: ReactiveRef ~> Effect
+read :: forall r. ReactiveRef r ~> Effect
 read = view _read
 
-changes :: ReactiveRef ~> Stream.Discrete
+write :: forall a. a -> WriteableRef a -> Effect Unit
+write = flip $ view _write
+
+modify :: forall a. (a -> a) -> WriteableRef a -> Effect Unit
+modify f ref = do
+    value <- read ref
+    write (f value) ref
+
+changes :: forall r. ReactiveRef r ~> Stream.Discrete
 changes = view _changes
 
-fromStream :: forall a. a -> Stream.Discrete a -> Cancelable (ReactiveRef a)
+fromStream :: forall a. a -> Stream.Discrete a -> Cancelable (ReadableRef a)
 fromStream initial changes = do
     ref <- liftEffect $ Ref.new initial
     Cancelable.subscribe changes $ flip Ref.write ref
@@ -44,33 +51,21 @@ fromStream initial changes = do
 writeable :: forall a. a -> Cancelable (WriteableRef a)
 writeable initial = do
     { event, push } <- liftEffect Stream.create
-    readable <- fromStream initial event
-    pure { write: push, ref: readable }
+    (ReactiveRef readable) <- fromStream initial event
+    pure $ ReactiveRef { write: push, read: readable.read, changes: readable.changes }
 
 
 ---------- Typeclass instances
-derive instance Newtype (ReactiveRef a) _
+derive instance Newtype (ReactiveRef r a) _
 
-derive instance Functor ReactiveRef
-
-instance Apply ReactiveRef where
-    apply (ReactiveRef f) (ReactiveRef a) = ReactiveRef
-        { read: apply f.read a.read
-        , changes: apply f.changes a.changes
-        }
-
-instance Applicative ReactiveRef where
-    pure a = ReactiveRef { read: pure a, changes: empty }
-
-write :: forall a. WriteableRef a -> a -> Effect Unit
-write = view _write
+derive instance Functor (ReactiveRef r)
 
 ---------- Lenses
-_read :: forall a. Lens' (ReactiveRef a) (Effect a)
+_read :: forall a r. Lens' (ReactiveRef r a) (Effect a)
 _read = _Newtype <<< prop (Proxy :: _ "read")
 
-_changes :: forall a. Lens' (ReactiveRef a) (Stream.Discrete a)
+_changes :: forall a r. Lens' (ReactiveRef r a) (Stream.Discrete a)
 _changes = _Newtype <<< prop (Proxy :: _ "changes")
 
 _write :: forall a. Lens' (WriteableRef a) (a -> Effect Unit)
-_write = prop (Proxy :: _ "write")
+_write = _Newtype <<< prop (Proxy :: _ "write")
