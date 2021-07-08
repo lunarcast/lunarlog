@@ -19,6 +19,7 @@
   , "web-html"
   , "profunctor-lenses"
   , "run"
+  , "zipperarray"
   ]
 , packages = ../../packages.dhall
 , sources = [ "src/**/*.purs" ]

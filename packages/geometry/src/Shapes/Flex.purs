@@ -80,7 +80,7 @@ withMinimumSize { fixSize, minimumSize } = fixSize minimumSize
 
 -- | Create a flex layout
 createFlexLayout :: forall a. FullConstructor FlexLayout OptionalFlexAttributes FlexInputAttributes a
-createFlexLayout attribs = unsafeUnion attribs defaults # _createLayout
+createFlexLayout attribs = unsafeUnion (unsafeCoerce attribs) defaults # _createLayout
 
 -- | Internal version of createLayout with fully saturated inputs
 _createLayout :: forall a. 

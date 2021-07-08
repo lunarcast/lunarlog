@@ -3,7 +3,7 @@ module Geometry.Shapes.None (none) where
 import Loglude
 
 import Geometry.Base (Geometry)
-import Geometry.Hiccup (class Hiccup, class IsAABB, buildGeometryBlueprint, pointInsideAABB, toAABB, translateByLens)
+import Geometry.Hiccup (class Hiccup, class IsAABB, buildGeometryBlueprint, noLocalCoordinates, pointInsideAABB, toAABB, translateByLens)
 import Geometry.Vector (Vec2)
 import Loglude.UntypedArray as UntypedArray
 
@@ -21,6 +21,8 @@ instance Hiccup None where
     toHiccup = const UntypedArray.nil
     bounds = toAABB
     pointInside = pointInsideAABB
+    toLocalCoordinates = noLocalCoordinates
+    children _ = []
 
 instance IsAABB None where
     toAABB (None { position }) = { position, size: zero } 

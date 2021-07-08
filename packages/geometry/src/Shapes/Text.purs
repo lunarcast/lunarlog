@@ -5,7 +5,7 @@ module Geometry.Shapes.Text
 import Loglude
 
 import Geometry.Base (type (<+>), AllAttributes, FullGeometryConstructor, Geometry, OptionalTextAttributes, TextAttributes)
-import Geometry.Hiccup (class Hiccup, class IsAABB, buildGeometryBlueprint, pointInsideAABB, toAABB, translateByLens)
+import Geometry.Hiccup (class Hiccup, class IsAABB, buildGeometryBlueprint, noLocalCoordinates, pointInsideAABB, toAABB, translateByLens)
 import Graphics.Canvas (Context2D)
 import Loglude.UntypedArray (UntypedArray)
 
@@ -24,6 +24,8 @@ instance Ask Context2D => Hiccup CustomTextAttributes where
     pointInside = pointInsideAABB
     toHiccup = textToHiccup
     bounds = toAABB
+    toLocalCoordinates = noLocalCoordinates
+    children _ = []
 
 instance Ask Context2D => IsAABB CustomTextAttributes where
     toAABB (CustomTextAttributes this) = do

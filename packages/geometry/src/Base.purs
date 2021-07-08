@@ -33,7 +33,6 @@ module Geometry.Base
     , render
     , attributes
     , allAttributes
-    , children
     , closestPoint
     , transform
     , transformVertices
@@ -168,7 +167,6 @@ foreign import _text :: forall a. ForeignGeometryConstructor
 
 foreign import render :: forall a. Context2D -> Geometry a -> Effect Unit
 foreign import attributes :: forall a. Geometry a -> Record (IncompleteGeometryAttributes a)
-foreign import children :: forall a. Geometry a -> Array (Geometry a)
 foreign import closestPoint :: forall a. Geometry a -> Vec2 -> Vec2
 
 foreign import transform :: forall a. TransformMatrix -> Geometry a -> Geometry a

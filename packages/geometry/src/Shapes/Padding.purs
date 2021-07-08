@@ -10,7 +10,7 @@ module Geometry.Shapes.Padding
 import Loglude
 
 import Data.Vec as Vec
-import Geometry.Base (type (<+>), Attributes, FullGeometryConstructor, GenericGeometryAttributes, Geometry, GeometryAttributes, AllAttributes, group, rect)
+import Geometry.Base (type (<+>), AllAttributes, Attributes, FullGeometryConstructor, GenericGeometryAttributes, Geometry, GeometryAttributes, group, rect)
 import Geometry.Hiccup (bounds, translate)
 import Geometry.Vector (Vec2)
 import Record as Record
@@ -43,9 +43,10 @@ defaults = { paddingPlacement: FixedCorner }
 _aabbPadding :: forall a. Record ((PaddingAttributes <+> OptionalPaddingAttributes) (GenericGeometryAttributes Opt a) a) -> Geometry a
 _aabbPadding attributes = process $ group
     { children: 
-        [ rect $ Record.union (unsafeCoerce attributes :: Record (GeometryAttributes a))
+        [ rect $ flip Record.merge (unsafeCoerce attributes :: Record (GeometryAttributes a))
             { position: position - amountTopLeft
             , size: size + amountTopLeft + amountBottomRight
+            , label: "Padding"
             } 
         , attributes.target
         ]
@@ -62,4 +63,4 @@ _aabbPadding attributes = process $ group
         FixedChild -> identity
 
 aabbPadding :: forall a. FullGeometryConstructor OptionalPaddingAttributes PaddingAttributes a
-aabbPadding attribs = unsafeUnion attribs defaults # _aabbPadding
+aabbPadding attribs = unsafeUnion (unsafeCoerce attribs) defaults # _aabbPadding

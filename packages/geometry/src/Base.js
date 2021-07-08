@@ -18,12 +18,6 @@ exports._text = (attribs) =>
 exports.render = (ctx) => (geometry) => () => hiccup.draw(ctx, geometry);
 exports.attributes = (geom) => geom.attribs;
 
-exports.children = (geometry) => {
-  if (geometry instanceof geom.Group) return geometry.children;
-
-  return [];
-};
-
 exports.closestPoint = (geometry) => (point) =>
   geom.closestPoint(geometry, point, []);
 

@@ -1,4 +1,5 @@
 dependencies:
+  '@thi.ng/defmulti': 1.3.13
   '@thi.ng/geom': 2.1.18
   '@thi.ng/geom-api': 2.0.21
   '@thi.ng/hiccup-canvas': 1.2.5
@@ -16,6 +17,10 @@ packages:
     dev: false
     resolution:
       integrity: sha512-3yraPCMzWldS20wMwcjmszEHSzzEe1st1iTvdv4mmP7kbxmNvOwcggA7ov71njU9kFnfg/t7ASZ+C2n+yyA8sA==
+  /@thi.ng/api/7.1.6:
+    dev: false
+    resolution:
+      integrity: sha512-7kKgZz+pP71hnbrcPSl9VbG3zFsNiKHktUuy465Qyn2Ow+v0GQvfM/PWyxT9TVOqSOu1f3PmQYc4vXGnPYOxgg==
   /@thi.ng/arrays/0.10.12:
     dependencies:
       '@thi.ng/api': 7.1.5
@@ -77,6 +82,13 @@ packages:
     dev: false
     resolution:
       integrity: sha512-8Qo+eFI6HUNFNDdgCusCg0KVkGGxOeHqSC5ZyiJw13APBQ6gLI/Ahk3DkejqAl4XHKcgWeiORARwFMMvUFytuw==
+  /@thi.ng/defmulti/1.3.13:
+    dependencies:
+      '@thi.ng/api': 7.1.6
+      '@thi.ng/errors': 1.3.2
+    dev: false
+    resolution:
+      integrity: sha512-ci1RqzQAM1h2GVfckellvRGJ4vKana9btZjfH1ofrbLXHyTHHQhDjWxPPEVPUGo6kHMF40tve4oZJPdKR+ejIA==
   /@thi.ng/distance/0.3.2:
     dependencies:
       '@thi.ng/api': 7.1.5
@@ -94,6 +106,10 @@ packages:
     dev: false
     resolution:
       integrity: sha512-Yuh20gmn3T1otq4gq9kP1yiQMnYq4wLdZ5VJzXDH6F9oSrzatV/NUVr46wsNtOMUWrrKK+8wQdo0HmDWPi2UVA==
+  /@thi.ng/errors/1.3.2:
+    dev: false
+    resolution:
+      integrity: sha512-M3EVckYsGPTg2TAgxgjjWzsmTVRoNLHR0bVq83e7qWg9Atc9fmrJh6bCea/wOQTRW3kjJ4gq8be2Yqi6nr9RzQ==
   /@thi.ng/geom-api/2.0.21:
     dependencies:
       '@thi.ng/api': 7.1.5
@@ -1840,6 +1856,7 @@ packages:
     resolution:
       integrity: sha512-OqedPIGOfsDlo31UNwYbCFMSaO9m9G/0faIHj5/dZFDMFqPTcx6UwqyOy3COEaEOg/9VsGIpdqn62W5KhoKSpg==
 specifiers:
+  '@thi.ng/defmulti': ^1.3.13
   '@thi.ng/geom': ^2.1.18
   '@thi.ng/geom-api': ^2.0.21
   '@thi.ng/hiccup-canvas': ^1.2.5

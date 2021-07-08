@@ -9,7 +9,7 @@ import Loglude
 
 import Geometry.Base (type (<+>), AllAttributes, Attributes, FullGeometryConstructor, GenericEventAttributes, Geometry)
 import Geometry.Base as Geometry
-import Geometry.Hiccup (class GeometryWrapper, class Hiccup, bounds, buildGeometryBlueprint, pointInside, toHiccup)
+import Geometry.Hiccup (class GeometryWrapper, class Hiccup, bounds, buildGeometryBlueprint, pointInside, toHiccup, toLocalCoordinates)
 import Geometry.Hiccup as Hiccup
 import Geometry.Transform (TransformMatrix, inverse, multiplyVector, translate)
 import Record.Unsafe.Union (unsafeUnion)
@@ -36,15 +36,16 @@ defaults =
     { transformBounds: true }
 
 transformed :: forall a. FullGeometryConstructor OptionalTransformedAttributes TransformedAttributes a
-transformed = flip unsafeUnion defaults >>> unsafeCoerce transformed_ 
+transformed = unsafeCoerce >>> flip unsafeUnion defaults >>> unsafeCoerce transformed_ 
 
 ---------- Typeclass instances
 instance Hiccup Transformed where
-    toHiccup (Transformed { transform, target }) = toHiccup $ Geometry.group { transform, children: [target] }
-    pointInside point (Transformed { transform, target }) = pointInside (multiplyVector inversed point) target
+    pointInside point geometry@(Transformed { target }) = pointInside projected target
         where
-        -- TODO: cache this
-        inversed = inverse transform
+        projected = toLocalCoordinates geometry point
+
+    toHiccup (Transformed { transform, target }) = toHiccup $ Geometry.group { transform, children: [target] }
+    children = view _target >>> pure
     translate amount shape 
         | view _transformBounds shape = over _transform (_ <> translate amount) shape
         | otherwise = over _target (Hiccup.translate amount) shape
@@ -52,8 +53,11 @@ instance Hiccup Transformed where
         | transformBounds = bounds $ Geometry.transform transform $ Geometry.rect $ bounds target
         | otherwise = bounds target
 
+    -- TODO: find a way to cache the inverse
+    toLocalCoordinates = view _transform >>> inverse >>> multiplyVector
+
 instance GeometryWrapper Transformed where
-    unwrapGeometry (Transformed { transform, target }) = Geometry.transform transform target
+    unwrapGeometry = view _target
 
 derive instance Newtype (Transformed a) _
 
