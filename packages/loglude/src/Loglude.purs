@@ -40,20 +40,16 @@ module Loglude
     , module Data.Newtype
     , module Type.Row
     , module Data.ZipperArray
+    , module Effect.Ref
     , module Run
     , module Run.Except
     , module Run.Reader
     , module Run.State
     , module Run.Writer
+    , module Loglude.ReactiveRef
     , module Data.Tuple.Nested ) where
 
 import Prelude
-
-import Run (EFFECT, Run, AFF)
-import Run.Except (EXCEPT, FAIL)
-import Run.Reader (READER)
-import Run.State (STATE)
-import Run.Writer (WRITER)
 
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Foldable (class Foldable, foldMap, foldl, foldr, for_, sum)
@@ -77,16 +73,23 @@ import Data.Vec (Vec, vec2)
 import Data.ZipperArray (ZipperArray)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Ref (Ref)
 import Foreign (Foreign)
 import Foreign.Object (Object)
 import Loglude.Ask (class Ask, ask, provide)
 import Loglude.Cancelable (Cancelable)
 import Loglude.MutableRecord (MutableRecord)
 import Loglude.Performance (now)
+import Loglude.ReactiveRef (ReactiveRef, WriteableRef)
 import Loglude.RecordLike (class RecordLike)
 import Loglude.Types (Id, Const, Pair)
 import Prim.Row (class Union)
 import Prim.RowList (class RowToList, RowList)
+import Run (EFFECT, Run, AFF)
+import Run.Except (EXCEPT, FAIL)
+import Run.Reader (READER)
+import Run.State (STATE)
+import Run.Writer (WRITER)
 import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
 import Type.RowList (class ListToRow)
