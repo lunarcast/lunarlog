@@ -30,11 +30,12 @@ data LunarlogType
 
 type AdtBranch =
     { name :: String
-    , arguments :: Array LunarlogType }
+    , arguments :: Array (String /\ LunarlogType)
+    }
 
 type AdtDeclaration =
     { name :: String
-    , args :: Array String
+    , typeArgs :: Array String
     , branches :: Array AdtBranch }
 
 data Declaration
