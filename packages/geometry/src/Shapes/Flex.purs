@@ -9,6 +9,7 @@ module Geometry.Shapes.Flex
     , withFixedSize
     , withMinimumSize
     , createFlexLayout
+    , wrapLayout
     ) where
 
 import Loglude
@@ -78,6 +79,18 @@ withFixedSize { fixSize } size = fixSize size
 withMinimumSize :: forall a. FlexLayout a -> Geometry a
 withMinimumSize { fixSize, minimumSize } = fixSize minimumSize
 
+wrapLayout :: forall a. (Geometry a -> Geometry a) -> FlexLayout a -> FlexLayout a
+wrapLayout wrapper { minimumSize, position, fixSize } = { position, minimumSize: wrappedMinimumSize, fixSize: \size -> fixSize (size - deltaSize) # wrapper }
+    where
+    deltaSize :: Vec2
+    deltaSize = wrappedMinimumSize - minimumSize 
+
+    wrappedMinimumSize :: Vec2
+    wrappedMinimumSize = wrapSize minimumSize
+
+    wrapSize :: Vec2 -> Vec2
+    wrapSize size = _.size $ bounds $ wrapper $ rect { position: position, size }
+
 -- | Create a flex layout
 createFlexLayout :: forall a. FullConstructor FlexLayout OptionalFlexAttributes FlexInputAttributes a
 createFlexLayout attribs = unsafeUnion (unsafeCoerce attribs) defaults # _createLayout
@@ -86,23 +99,14 @@ createFlexLayout attribs = unsafeUnion (unsafeCoerce attribs) defaults # _create
 _createLayout :: forall a. 
         AllAttributes (FlexInputAttributes <+> OptionalFlexAttributes) a -> 
         FlexLayout a
-_createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretchChildren, position, wrap, enforceSize } =
-    { fixSize: \exact -> if Array.null children then none position else wrap $ stackFixed (exact - deltaSize)
-    , minimumSize: wrappedMinimumSize
-    , position: position
+_createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretchChildren, position, wrap, enforceSize } = wrapLayout wrap
+    { fixSize: \exact -> if Array.null children then none position else stackFixed exact
+    , minimumSize
+    , position 
     }
     where
-    deltaSize :: Vec2
-    deltaSize = wrappedMinimumSize - minimumSize 
-
-    wrappedMinimumSize :: Vec2
-    wrappedMinimumSize = wrapSize minimumSize
-
     minimumSize :: Vec2
     minimumSize = buildFromAxis axis primarySize secondarySize
-
-    wrapSize :: Vec2 -> Vec2
-    wrapSize size = _.size $ bounds $ wrap $ rect { position: position, size }
 
     childSize = case _ of
         NotLayout a -> bounds a

@@ -8,11 +8,14 @@ module Geometry.Tea
     , stopPropagation
     , currentGeometry
     , shouldRecompute
+    , eventStream
+    , createMouseEvent
     ) where
 
 import Loglude
 
 import Data.Array as Array
+import Data.MouseButton (MouseButtons(..))
 import Data.Undefined.NoProblem as Opt
 import Data.ZipperArray as ZipperArray
 import Data.ZipperArray as Zipperrry
@@ -24,16 +27,15 @@ import Geometry.Base as Geometry
 import Geometry.Hiccup (children, pointInside, toLocalCoordinates)
 import Graphics.Canvas (Context2D, clearRect)
 import Loglude.Cancelable as Cancelable
-import Prim.Row as Row
 import Record as Record
 import Run (Step(..), on, runAccumPure, runBaseEffect)
 import Run as Run
 import Run.State (_state, execState)
 import Web.Event.Event (EventType)
 import Web.Event.Internal.Types (Event)
-import Web.HTML.Event.EventTypes as EventType
 import Web.HTML.HTMLElement as HtmlElement
 import Web.UIEvent.MouseEvent as MouseEvent
+import Web.UIEvent.MouseEvent.EventTypes (mousedown, mouseup, click) as EventType
 
 ---------- Types
 newtype EventCheckGenerator a = EventCheckGenerator (Geometry a -> EventChecker a)
@@ -82,6 +84,17 @@ stopPropagation = Run.lift _tea $ StopPropagation unit
 shouldRecompute :: forall action result. Run (TEA action result) Unit
 shouldRecompute = Run.lift _tea $ ShouldRecompute unit
 
+createMouseEvent :: MouseEvent -> CanvasMouseEvent
+createMouseEvent ev = 
+    { buttons: MouseButtons $ MouseEvent.buttons ev
+    , worldPosition: position 
+    , localPosition: position 
+    }
+    where
+    position = toNumber <$> vec2  
+        (MouseEvent.clientX ev) 
+        (MouseEvent.clientY ev)
+
 ---------- Helpers
 runTea :: forall state action. state -> Geometry action -> TeaM state action Unit -> Effect (TeaResult state) 
 runTea state geometry = execState state >>> runTea >>> map asRecord >>> runBaseEffect
@@ -94,21 +107,22 @@ runTea state geometry = execState state >>> runTea >>> map asRecord >>> runBaseE
     handler old (ShouldRecompute next) = old { shouldRecompute = true } /\ next
     handler propagation (CurrentGeometry continue) = propagation /\ continue geometry
 
-checkGenerator :: forall action key remaining.
-    Row.Cons key (Opt (CanvasMouseEvent -> action)) remaining (IncompleteGeometryAttributes action) => 
-    IsSymbol key => 
-    Proxy key -> CanvasMouseEvent -> EventChecker action
-checkGenerator key event = check /\ EventCheckGenerator \geometry -> do
-    let newEvent = recurse geometry event
-    checkGenerator key newEvent
+checkMouseEvents :: forall action. (Record (IncompleteGeometryAttributes action) -> Opt (CanvasMouseEvent -> action)) -> CanvasMouseEvent -> EventChecker action
+checkMouseEvents key event = check /\ EventCheckGenerator \geometry -> do
+    let newEvent = event { localPosition = toLocalCoordinates geometry event.localPosition }
+    checkMouseEvents key newEvent
     where
-    recurse parent event = event { position = toLocalCoordinates parent event.position }
-
-    check geom = case Opt.toMaybe $ Record.get key attribs of
-        Just handler | pointInside event.position geom -> Just $ handler event
+    check geom = case Opt.toMaybe $ key attribs of
+        Just handler | pointInside event.localPosition geom -> Just $ handler event
         _ -> Nothing
         where
         attribs = attributes geom 
+
+handleActions :: forall action. (action -> Effect Boolean) -> ZipperArray action -> Effect Unit
+handleActions propagateAction zipper = do
+    continuePropagation <- propagateAction (ZipperArray.current zipper)
+    when continuePropagation do
+        for_ (Zipperrry.goNext zipper) $ handleActions propagateAction
 
 ---------- Implementations
 launchTea :: forall state action. Tea state action -> Cancelable Unit
@@ -127,6 +141,8 @@ launchTea tea = do
           when result.shouldRecompute $ Ref.write true shouldRecompute
           pure result.continuePropagation
 
+    let propagateActions actions = for_ (ZipperArray.fromArray actions) $ handleActions propagateAction
+
     let loop = const do
           Ref.read shouldRecompute >>= flip when do
             thisState <- Ref.read state
@@ -143,32 +159,22 @@ launchTea tea = do
             Ref.write false dirty
 
     Cancelable.subscribe raf loop
+    Cancelable.subscribe mousedown \ev -> do
+        currentGeometry <- Ref.read geometry
+        propagateActions $ dispatchEvent (checkMouseEvents _.onClick $ createMouseEvent ev) currentGeometry
+    Cancelable.subscribe mouseup \ev -> do
+        currentGeometry <- Ref.read geometry
+        propagateActions $ dispatchEvent (checkMouseEvents _.onMouseup $ createMouseEvent ev) currentGeometry
     Cancelable.subscribe clicks \ev -> do
         currentGeometry <- Ref.read geometry
+        propagateActions $ dispatchEvent (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
 
-        let event :: CanvasMouseEvent
-            event = 
-                { buttons: MouseEvent.buttons ev
-                , position: toNumber <$> vec2  
-                    (MouseEvent.clientX ev) 
-                    (MouseEvent.clientY ev) 
-                }
-
-            actions = dispatchEvent (checkGenerator (Proxy :: _ "onClick") event) currentGeometry
-
-        let 
-          go :: ZipperArray action -> Effect Unit
-          go zipper = do
-            continuePropagation <- propagateAction (ZipperArray.current zipper)
-            when continuePropagation do
-                for_ (Zipperrry.goNext zipper) go
-
-        for_ (ZipperArray.fromArray actions) go
 
     tea.setup { propagateAction: propagateAction >>> void }
     where
-    clicks :: Stream.Discrete MouseEvent
-    clicks = eventStream (MouseEvent.fromEvent) EventType.click
+    clicks = eventStream MouseEvent.fromEvent EventType.click
+    mousedown = eventStream MouseEvent.fromEvent EventType.mousedown
+    mouseup = eventStream MouseEvent.fromEvent EventType.mouseup
 
     raf :: Stream.Discrete Unit
     raf = animationFrame

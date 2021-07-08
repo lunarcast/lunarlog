@@ -40,6 +40,7 @@ module Geometry.Base
 
 import Loglude
 
+import Data.MouseButton (MouseButtons)
 import Geometry.TextBaseline (TextBaseline)
 import Geometry.Transform (TransformMatrix)
 import Geometry.Vector (Vec2, distance, distanceSquared)
@@ -56,6 +57,8 @@ data ClickCheck
 type GenericEventAttributes :: (Type -> Type) -> Attributes
 type GenericEventAttributes f r action =
     ( onClick :: f (CanvasMouseEvent -> action) 
+    , onMousedown :: f (CanvasMouseEvent -> action) 
+    , onMouseup :: f (CanvasMouseEvent -> action)  
     | r )
 
 type GenericGeometryAttributes :: (Type -> Type) -> Type -> Row Type
@@ -132,7 +135,11 @@ type OptionalTextAttributes r a =
     , font :: String 
     | r )
 
-type CanvasMouseEvent = { buttons :: Int, position :: Vec2 }
+type CanvasMouseEvent = 
+    { buttons :: MouseButtons
+    , localPosition :: Vec2 
+    , worldPosition :: Vec2
+    }
 
 ---------- Constructors
 group :: forall a. FullGeometryConstructor OptionalGroupAttributes GroupAttributes a 
