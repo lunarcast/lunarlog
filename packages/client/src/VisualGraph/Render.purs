@@ -3,7 +3,7 @@ module Lunarlog.Client.VisualGraph.Render where
 import Loglude
 
 import Effect.Unsafe (unsafePerformEffect)
-import Geometry (Axis(..), Geometry)
+import Geometry (Axis(..), Geometry, CanvasMouseEvent)
 import Geometry as Geometry
 import Geometry.Shapes.Flex (FlexLayout)
 import Geometry.Shapes.Flex as Flex
@@ -19,7 +19,7 @@ import Lunarlog.Core.NodeGraph as NodeGraph
 foreign import shellGeometry :: forall a. Effect (Geometry a)
 foreign import writeGeometry :: forall a. Geometry a -> Geometry a -> Effect Unit
 
-withStream :: forall a b. RR.ReactiveRef b -> (b -> Geometry a) -> Geometry a
+withStream :: forall a r b. ReactiveRef r b -> (b -> Geometry a) -> Geometry a
 withStream stream build = unsafePerformEffect $ Cancelable.perform do
     shell <- liftEffect shellGeometry
     let mapped = stream <#> build
@@ -47,6 +47,9 @@ patternFont = "22px Source Code Pro"
 patternPadding :: Number
 patternPadding = 30.0
 
+itemSpacing :: Number
+itemSpacing = 16.0
+
 pinRadius :: Number
 pinRadius = 15.0
 
@@ -54,12 +57,15 @@ pinRadius = 15.0
 data PatternAction 
     = ClickedPin PinId
     | SelectNode NodeId
+    | MouseMove CanvasMouseEvent
+    | MouseUp CanvasMouseEvent
+    | RefreshSelection CanvasMouseEvent
 
 data PinSide = LeftPin | RightPin
 
 ---------- Implementation
 renderPattern :: Ask Context2D => VisualGraph.Pattern -> NodeGraph.Pattern -> Geometry PatternAction
-renderPattern { position: { ref } } pattern = 
+renderPattern { position: ref } pattern = 
     withStream ref \position -> 
         Geometry.transformed
             { transform: Transform.translate position
@@ -75,7 +81,7 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
     , wrap: \child -> Geometry.aabbPadding
             { target: child
             , weight: 3.0
-            , amount: Geometry.fourWayPadding patternPadding 10.0 0.0 0.0
+            , amount: Geometry.fourWayPadding patternPadding itemSpacing 0.0 itemSpacing
             , fill: patternBackground 
             , stroke: patternStrokeColor
             , onClick: const $ ClickedPin $ PinId 1000
@@ -92,7 +98,7 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
                     , font: patternFont
                     , baseline: TextBaseline.top
                     }
-                , amount: Geometry.fourWayPadding 10.0 0.0 30.0 10.0
+                , amount: Geometry.fourWayPadding 0.0 0.0 patternPadding 0.0
                 }
             }
         ] <> argumentGeometries
@@ -105,18 +111,21 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
             , arrangeChildren: Flex.SpaceBetween
             , children: [ Flex.NotLayout $ pin id LeftPin $ -offset, Flex.NotLayout $ pin id RightPin 0.0 ]
             }  
-        NestedPattern pattern -> Flex.IsLayout $ renderPatternLayout pattern $ offset + patternPadding
+        NestedPattern pattern -> Flex.IsLayout $ Flex.wrapLayout withSpacing $ renderPatternLayout pattern $ offset + patternPadding
+
+withSpacing :: forall a. Geometry a -> Geometry a
+withSpacing target = Geometry.aabbPadding
+    { target
+    , amount: Geometry.fourWayPadding 0.0 itemSpacing 0.0 0.0
+    }
 
 pin :: PinId -> PinSide -> Number -> Geometry PatternAction
 pin id side extraOffset = Geometry.transformed 
-    { target: Geometry.aabbPadding 
-        { target: Geometry.circle
-            { radius: pinRadius
-            , position: zero
-            , fill: pinColor 
-            , onClick: const $ ClickedPin id
-            }
-        , amount: Geometry.fourWayPadding 0.0 10.0 0.0 10.0
+    { target: withSpacing $ Geometry.circle
+        { radius: pinRadius
+        , position: zero
+        , fill: pinColor 
+        , onClick: const $ ClickedPin id
         }
     , transform: Transform.translate (vec2 offset 0.0)
     , transformBounds: false
