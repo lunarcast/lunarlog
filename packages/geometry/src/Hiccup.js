@@ -32,11 +32,11 @@ exports.buildGeometryBlueprintImpl =
         }
 
         pointInside(point) {
-          return pointInside(point)(this.attribs);
+          return pointInside(point)(this.attribs)();
         }
 
         bounds() {
-          return aabbToForeign(bounds(this.attribs));
+          return aabbToForeign(bounds(this.attribs)());
         }
 
         copy() {
@@ -44,15 +44,15 @@ exports.buildGeometryBlueprintImpl =
         }
 
         children() {
-          return children(this.attribs);
+          return children(this.attribs)();
         }
 
         toLocalCoordinates(point) {
-          return toLocalCoordinates(this.attribs)(point);
+          return toLocalCoordinates(this.attribs)(point)();
         }
 
         toHiccup() {
-          return toHiccup(this.attribs);
+          return toHiccup(this.attribs)();
         }
       },
     }[name];

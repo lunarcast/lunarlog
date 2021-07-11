@@ -4,6 +4,7 @@ module Geometry.Shapes.Text
 
 import Loglude
 
+import Effect.Uncurried (EffectFn1, runEffectFn1)
 import Geometry.Base (type (<+>), AllAttributes, FullGeometryConstructor, Geometry, OptionalTextAttributes, TextAttributes)
 import Geometry.Hiccup (class Hiccup, class IsAABB, buildGeometryBlueprint, noLocalCoordinates, pointInsideAABB, toAABB, translateByLens)
 import Graphics.Canvas (Context2D)
@@ -22,10 +23,10 @@ text = unsafeCoerce _text
 instance Ask Context2D => Hiccup CustomTextAttributes where
     translate = translateByLens (_Newtype <<< prop (Proxy :: _ "position"))
     pointInside = pointInsideAABB
-    toHiccup = textToHiccup
-    bounds = toAABB
+    toHiccup = runEffectFn1 textToHiccup
+    bounds = toAABB >>> pure
     toLocalCoordinates = noLocalCoordinates
-    children _ = []
+    children _ = pure []
 
 instance Ask Context2D => IsAABB CustomTextAttributes where
     toAABB (CustomTextAttributes this) = do
@@ -42,5 +43,5 @@ type TextMetrics =
     , fontBoundingBoxAscent :: Number
     }
 
-foreign import textToHiccup :: forall a. CustomTextAttributes a -> UntypedArray
+foreign import textToHiccup :: forall a. EffectFn1 (CustomTextAttributes a) UntypedArray
 foreign import measureText :: Context2D -> String -> String -> TextMetrics

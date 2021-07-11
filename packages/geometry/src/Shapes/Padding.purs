@@ -12,6 +12,7 @@ import Loglude
 import Data.Vec as Vec
 import Geometry.Base (type (<+>), AllAttributes, Attributes, FullGeometryConstructor, GenericGeometryAttributes, Geometry, GeometryAttributes, group, rect)
 import Geometry.Hiccup (bounds, translate)
+import Geometry.Shapes.Effectful (effectful)
 import Geometry.Vector (Vec2)
 import Record as Record
 import Record.Unsafe.Union (unsafeUnion)
@@ -41,26 +42,26 @@ defaults :: forall a. AllAttributes OptionalPaddingAttributes a
 defaults = { paddingPlacement: FixedCorner }
 
 _aabbPadding :: forall a. Record ((PaddingAttributes <+> OptionalPaddingAttributes) (GenericGeometryAttributes Opt a) a) -> Geometry a
-_aabbPadding attributes = process $ group
-    { children: 
-        [ rect $ flip Record.merge (unsafeCoerce attributes :: Record (GeometryAttributes a))
-            { position: position - amountTopLeft
-            , size: size + amountTopLeft + amountBottomRight
-            , label: "Padding"
-            } 
-        , attributes.target
-        ]
-    , label: "Padding container"
-    }
-    where
-    { position, size } = bounds attributes.target
-    amountTopLeft = Vec.take d2 attributes.amount
-    amountBottomRight = Vec.drop d2 attributes.amount
+_aabbPadding attributes = effectful $ bounds attributes.target <#> \{ position, size } -> do
+    let amountTopLeft = Vec.take d2 attributes.amount
+    let amountBottomRight = Vec.drop d2 attributes.amount
 
     -- | The amount we shift all the children by
-    process = case attributes.paddingPlacement of
-        FixedCorner -> translate amountTopLeft
-        FixedChild -> identity
+    let process = case attributes.paddingPlacement of
+         FixedCorner -> translate amountTopLeft
+         FixedChild -> identity
+
+    process $ group
+        { children: 
+            [ rect $ flip Record.merge (unsafeCoerce attributes :: Record (GeometryAttributes a))
+                { position: position - amountTopLeft
+                , size: size + amountTopLeft + amountBottomRight
+                , label: "Padding"
+                } 
+            , attributes.target
+            ]
+        , label: "Padding container"
+        }
 
 aabbPadding :: forall a. FullGeometryConstructor OptionalPaddingAttributes PaddingAttributes a
 aabbPadding attribs = unsafeUnion (unsafeCoerce attribs) defaults # _aabbPadding

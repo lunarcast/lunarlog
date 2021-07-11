@@ -18,11 +18,11 @@ derive instance Newtype (None a) _
 
 instance Hiccup None where
     translate = translateByLens _position
-    toHiccup = const UntypedArray.nil
-    bounds = toAABB
+    toHiccup = const $ pure $ UntypedArray.nil
+    bounds = toAABB >>> pure
     pointInside = pointInsideAABB
     toLocalCoordinates = noLocalCoordinates
-    children _ = []
+    children _ = pure []
 
 instance IsAABB None where
     toAABB (None { position }) = { position, size: zero } 

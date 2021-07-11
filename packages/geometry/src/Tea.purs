@@ -38,8 +38,8 @@ import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes (mousedown, mouseup, click) as EventType
 
 ---------- Types
-newtype EventCheckGenerator a = EventCheckGenerator (Geometry a -> EventChecker a)
-type EventChecker a = (Geometry a -> Maybe a) /\ EventCheckGenerator a
+newtype EventCheckGenerator a = EventCheckGenerator (Geometry a -> Effect (EventChecker a))
+type EventChecker a = (Geometry a -> Effect (Maybe a)) /\ EventCheckGenerator a
 
 data TeaF action result
     = StopPropagation result
@@ -108,13 +108,18 @@ runTea state geometry = execState state >>> runTea >>> map asRecord >>> runBaseE
     handler propagation (CurrentGeometry continue) = propagation /\ continue geometry
 
 checkMouseEvents :: forall action. (Record (IncompleteGeometryAttributes action) -> Opt (CanvasMouseEvent -> action)) -> CanvasMouseEvent -> EventChecker action
-checkMouseEvents key event = check /\ EventCheckGenerator \geometry -> do
-    let newEvent = event { localPosition = toLocalCoordinates geometry event.localPosition }
-    checkMouseEvents key newEvent
+checkMouseEvents key event = check /\ EventCheckGenerator \geometry -> ado
+        localPosition <- toLocalCoordinates geometry event.localPosition 
+        let newEvent = event { localPosition = localPosition }
+        in checkMouseEvents key newEvent
     where
     check geom = case Opt.toMaybe $ key attribs of
-        Just handler | pointInside event.localPosition geom -> Just $ handler event
-        _ -> Nothing
+        Just handler -> ado
+            result <- pointInside event.localPosition geom
+            in if result
+                then Just $ handler event 
+                else Nothing
+        Nothing -> pure Nothing
         where
         attribs = attributes geom 
 
@@ -161,13 +166,13 @@ launchTea tea = do
     Cancelable.subscribe raf loop
     Cancelable.subscribe mousedown \ev -> do
         currentGeometry <- Ref.read geometry
-        propagateActions $ dispatchEvent (checkMouseEvents _.onClick $ createMouseEvent ev) currentGeometry
+        propagateActions =<< dispatchEvent (checkMouseEvents _.onClick $ createMouseEvent ev) currentGeometry
     Cancelable.subscribe mouseup \ev -> do
         currentGeometry <- Ref.read geometry
-        propagateActions $ dispatchEvent (checkMouseEvents _.onMouseup $ createMouseEvent ev) currentGeometry
+        propagateActions =<< dispatchEvent (checkMouseEvents _.onMouseup $ createMouseEvent ev) currentGeometry
     Cancelable.subscribe clicks \ev -> do
         currentGeometry <- Ref.read geometry
-        propagateActions $ dispatchEvent (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
+        propagateActions =<< dispatchEvent (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
 
 
     tea.setup { propagateAction: propagateAction >>> void }
@@ -180,15 +185,14 @@ launchTea tea = do
     raf = animationFrame
 
 
-dispatchEvent :: forall a. EventChecker a -> Geometry a -> Array a
-dispatchEvent (check /\ EventCheckGenerator recurse) geometry = [Array.last nested, current <#> pure] >>= (fromMaybe [])
-    where
-    current = check geometry
-    continue = recurse geometry
-    nested = next 
-        <#> (\child -> dispatchEvent continue child)
-        # Array.filter (Array.null >>> not)
-    next = children geometry
+dispatchEvent :: forall a. EventChecker a -> Geometry a -> Effect (Array a)
+dispatchEvent (check /\ (EventCheckGenerator recurse)) geometry = do
+    continue <- recurse geometry
+    current <- check geometry
+    nested <- children geometry 
+        >>= traverse (\child -> dispatchEvent continue child)
+        <#> Array.filter (Array.null >>> not)
+    pure $ [Array.last nested, current <#> pure] >>= (fromMaybe [])
 
 eventStream :: forall e. (Event -> Maybe e) -> EventType -> Stream.Discrete e 
 eventStream fromEvent eventType = Cancelable.createStream \emit -> do

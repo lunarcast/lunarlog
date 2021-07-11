@@ -5,6 +5,7 @@ module Geometry.Shapes.Flex
     , LayoutChild(..)
     , FlexInputAttributes
     , OptionalFlexAttributes
+    , PureFlexLayout
     , FlexLayout
     , withFixedSize
     , withMinimumSize
@@ -16,12 +17,13 @@ import Loglude
 
 import Data.Array as Array
 import Data.Foldable (maximum)
+import Data.Traversable (for)
 import Geometry (AllAttributes, Attributes, Geometry, Vec2, bounds, buildFromAxis, group, indexByAxis, other, rect, translate)
 import Geometry as Geometry
 import Geometry.Base (type (<+>), AABB, FullConstructor)
+import Geometry.Shapes.Effectful (effectful)
 import Geometry.Shapes.None (none)
 import Geometry.Vector (Axis, rmapAxis)
-import Prelude (identity)
 import Record.Unsafe.Union (unsafeUnion)
 
 data Arrangement
@@ -39,7 +41,6 @@ data Alignment
 data LayoutChild a
     = NotLayout (Geometry a)
     | IsLayout (FlexLayout a)
-    | Offset Vec2 (LayoutChild a)
 
 type FlexInputAttributes :: Attributes
 type FlexInputAttributes r a = 
@@ -57,11 +58,13 @@ type OptionalFlexAttributes r a =
     , position :: Vec2
     | r )
 
-type FlexLayout a = 
+type PureFlexLayout a = 
     { fixSize :: Vec2 -> Geometry a
     , minimumSize :: Vec2
     , position :: Vec2
     }
+
+type FlexLayout a = Effect (PureFlexLayout a)
 
 defaults :: forall a. AllAttributes OptionalFlexAttributes a
 defaults = 
@@ -74,22 +77,19 @@ defaults =
     }
 
 withFixedSize :: forall a. FlexLayout a -> Vec2 -> Geometry a
-withFixedSize { fixSize } size = fixSize size 
+withFixedSize layout size = effectful $ layout <#> \{ fixSize } -> fixSize size 
 
 withMinimumSize :: forall a. FlexLayout a -> Geometry a
-withMinimumSize { fixSize, minimumSize } = fixSize minimumSize
+withMinimumSize layout = effectful $ layout <#> \{ fixSize, minimumSize } -> fixSize minimumSize
 
 wrapLayout :: forall a. (Geometry a -> Geometry a) -> FlexLayout a -> FlexLayout a
-wrapLayout wrapper { minimumSize, position, fixSize } = { position, minimumSize: wrappedMinimumSize, fixSize: \size -> fixSize (size - deltaSize) # wrapper }
-    where
-    deltaSize :: Vec2
-    deltaSize = wrappedMinimumSize - minimumSize 
+wrapLayout wrapper layout = do
+    { fixSize, minimumSize, position } <- layout
+    
+    wrappedMinimumSize <- map _.size $ bounds $ wrapper $ rect { position: position, size: minimumSize }
+    let deltaSize = wrappedMinimumSize - minimumSize 
 
-    wrappedMinimumSize :: Vec2
-    wrappedMinimumSize = wrapSize minimumSize
-
-    wrapSize :: Vec2 -> Vec2
-    wrapSize size = _.size $ bounds $ wrapper $ rect { position: position, size }
+    pure { position, minimumSize: wrappedMinimumSize, fixSize: \size -> fixSize (size - deltaSize) # wrapper }
 
 -- | Create a flex layout
 createFlexLayout :: forall a. FullConstructor FlexLayout OptionalFlexAttributes FlexInputAttributes a
@@ -99,84 +99,64 @@ createFlexLayout attribs = unsafeUnion (unsafeCoerce attribs) defaults # _create
 _createLayout :: forall a. 
         AllAttributes (FlexInputAttributes <+> OptionalFlexAttributes) a -> 
         FlexLayout a
-_createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretchChildren, position, wrap, enforceSize } = wrapLayout wrap
-    { fixSize: \exact -> if Array.null children then none position else stackFixed exact
-    , minimumSize
-    , position 
-    }
-    where
-    minimumSize :: Vec2
-    minimumSize = buildFromAxis axis primarySize secondarySize
-
-    childSize = case _ of
+_createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretchChildren, position, wrap, enforceSize } = do
+    childrenSizes <- for children case _ of
         NotLayout a -> bounds a
-        IsLayout { position, minimumSize } -> { position, size: minimumSize }
-        Offset _ inner -> childSize inner
+        IsLayout layout -> layout <#> \layout -> { position: layout.position, size: layout.minimumSize }
 
-    childrenSizes :: Array AABB
-    childrenSizes = children <#> childSize
+    let primarySize = foldr (+) 0.0 $ (_.size >>> indexByAxis axis) <$> childrenSizes
+    let secondarySize = fromMaybe 0.0 $ maximum $ (indexByAxis (other axis) <<<_.size) <$> childrenSizes
 
-    primarySize :: Number
-    primarySize = foldr (+) 0.0 $ (_.size >>> indexByAxis axis) <$> childrenSizes
- 
-    secondarySize :: Number
-    secondarySize = fromMaybe 0.0 $ maximum $ (indexByAxis (other axis) <<<_.size) <$> childrenSizes
-
-    stackFixed :: Vec2 -> Geometry a
-    stackFixed fixedSize = group
-        { children: processShapes $ Array.scanl scanner (startingOffset /\ none zero) childrenWithFixedSizes <#> snd
-        , label: "Flex container"
-        }
-        where
-        processShapes :: Array (Geometry a) -> Array (Geometry a)
-        processShapes shapes | enforceSize = Array.cons invisibleAABB shapes
-                             | otherwise = shapes
-
-        invisibleAABB :: Geometry a
-        invisibleAABB = Geometry.rect
+    let 
+      stackFixed :: Vec2 -> Geometry a
+      stackFixed fixedSize = effectful do 
+        let
+          invisibleAABB :: Geometry a
+          invisibleAABB = Geometry.rect
             { position
             , size: fixedSize
             }
 
-        childrenWithSizes :: Array (LayoutChild a /\ AABB)
-        childrenWithSizes = Array.zip children childrenSizes
+          processShapes :: Array (Geometry a) -> Array (Geometry a)
+          processShapes shapes | enforceSize = Array.cons invisibleAABB shapes
+                             | otherwise = shapes
 
-        childrenWithFixedSizes :: Array (Geometry a /\ AABB)
-        childrenWithFixedSizes = childrenWithSizes <#> uncurry fixSize
-            where
-            childSecondarySize :: Number -> Number
-            childSecondarySize minimumSize | stretchChildren = indexByAxis (other axis) fixedSize
-                                           | otherwise = minimumSize
+          childrenWithSizes :: Array (LayoutChild a /\ AABB)
+          childrenWithSizes = Array.zip children childrenSizes
 
-            fixSize :: LayoutChild a -> AABB -> (Geometry a /\ AABB)
-            fixSize (NotLayout geometry) oldBounds = geometry /\ oldBounds
-            fixSize (IsLayout { fixSize, minimumSize, position }) { size } = do
-                let fixedChild = fixSize $ rmapAxis axis childSecondarySize size
-                fixedChild /\ { position, size }
-            fixSize (Offset amount child) oldBounds = over ((_2 <<< _position)) mapPosition inner 
-                where
-                mapPosition = flip (-) amount
-                inner = fixSize child oldBounds
+        childrenWithFixedSizes <- do
+            let childSecondarySize minimumSize 
+                  | stretchChildren = indexByAxis (other axis) fixedSize
+                  | otherwise = minimumSize
 
-        totalSize :: Vec2
-        totalSize = sum $ (_.size <<< snd) <$> childrenWithFixedSizes
+            for childrenWithSizes $ uncurry case _, _ of
+                NotLayout geometry, oldBounds -> pure $ geometry /\ oldBounds
+                IsLayout inner, { size } -> do
+                    { position, minimumSize, fixSize } <- inner
 
-        -- | How much empty space is going to be left on the primary axis
-        emptyPrimarySpace :: Number
-        emptyPrimarySpace = indexByAxis axis fixedSize - indexByAxis axis totalSize
+                    let fixedChild = fixSize $ rmapAxis axis childSecondarySize size
+                    pure $ fixedChild /\ { position, size }
 
-        childrenCount :: Number
-        childrenCount = toNumber $ Array.length children
+        let
+          totalSize :: Vec2
+          totalSize = sum $ (_.size <<< snd) <$> childrenWithFixedSizes
 
-        startingOffset :: Number
-        startingOffset = case arrangeChildren of
+          -- | How much empty space is going to be left on the primary axis
+          emptyPrimarySpace :: Number
+          emptyPrimarySpace = indexByAxis axis fixedSize - indexByAxis axis totalSize
+
+          childrenCount :: Number
+          childrenCount = toNumber $ Array.length children
+
+          startingOffset :: Number
+          startingOffset = case arrangeChildren of
             ArrangeEnd -> emptyPrimarySpace
             ArrangeCenter -> emptyPrimarySpace / 2.0
             SpaceBetween -> -emptyPrimarySpace / (childrenCount - 1.0)
             _ -> 0.0
 
-        scanner :: (Number /\ Geometry a) -> (Geometry a /\ AABB) -> (Number /\ Geometry a)
-        scanner (offset /\ _) (geometry /\ fixedBounds) = newOffset /\ translate (screenOffset + position - fixedBounds.position) geometry
+          scanner :: (Number /\ Geometry a) -> (Geometry a /\ AABB) -> (Number /\ Geometry a)
+          scanner (offset /\ _) (geometry /\ fixedBounds) = newOffset /\ translate (screenOffset + position - fixedBounds.position) geometry
             where
             screenOffset :: Vec2
             screenOffset = buildFromAxis axis primary secondary
@@ -194,12 +174,19 @@ _createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretc
             newOffset :: Number
             newOffset = indexByAxis axis (fixedBounds.size + screenOffset)
 
+        pure $ group
+          { children: processShapes $ Array.scanl scanner (startingOffset /\ none zero) childrenWithFixedSizes <#> snd
+          , label: "Flex container"
+          }
+
+    wrapLayout wrap $ pure
+        { fixSize: \exact -> if Array.null children then none position else stackFixed exact
+        , minimumSize: buildFromAxis axis primarySize secondarySize
+        , position 
+        }
+
 ---------- Typeclass instances
 derive instance Generic Arrangement _
 
 instance Show Arrangement where
     show = genericShow
-
----------- Lenses    
-_position :: forall r. Lens' { position :: Vec2 | r } Vec2
-_position = prop (Proxy :: _ "position")

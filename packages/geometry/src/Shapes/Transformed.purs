@@ -40,24 +40,25 @@ transformed = unsafeCoerce >>> flip unsafeUnion defaults >>> unsafeCoerce transf
 
 ---------- Typeclass instances
 instance Hiccup Transformed where
-    pointInside point geometry@(Transformed { target }) = pointInside projected target
-        where
-        projected = toLocalCoordinates geometry point
-
+    pointInside point geometry@(Transformed { target }) = do
+        projected <- toLocalCoordinates geometry point
+        pointInside projected target
     toHiccup (Transformed { transform, target }) = toHiccup $ Geometry.group { transform, children: [target] }
-    children = view _target >>> pure
+    children = view _target >>> pure >>> pure
     translate amount shape 
         | view _transformBounds shape = over _transform (_ <> translate amount) shape
         | otherwise = over _target (Hiccup.translate amount) shape
     bounds (Transformed { transform, target, transformBounds })
-        | transformBounds = bounds $ Geometry.transform transform $ Geometry.rect $ bounds target
+        | transformBounds = do
+            targetBounds <- bounds target
+            bounds $ Geometry.transform transform $ Geometry.rect targetBounds
         | otherwise = bounds target
 
     -- TODO: find a way to cache the inverse
-    toLocalCoordinates = view _transform >>> inverse >>> multiplyVector
+    toLocalCoordinates = view _transform >>> inverse >>> multiplyVector >>> (<<<) pure
 
 instance GeometryWrapper Transformed where
-    unwrapGeometry = view _target
+    unwrapGeometry = view _target >>> pure
 
 derive instance Newtype (Transformed a) _
 
