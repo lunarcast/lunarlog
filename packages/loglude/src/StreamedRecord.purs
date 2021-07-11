@@ -24,10 +24,10 @@ class StreamsToAttribsRL rowList row target | rowList row -> target where
 
 instance 
     ( StreamsToAttribsRL tail row left
-    , Row.Cons key (RR.ReactiveRef prop) remaining row
+    , Row.Cons key (RR.ReactiveRef r prop) remaining row
     , Row.Cons key prop left target
     , IsSymbol key
-    ) => StreamsToAttribsRL (RowList.Cons key (RR.ReactiveRef prop) tail) row target where
+    ) => StreamsToAttribsRL (RowList.Cons key (RR.ReactiveRef r prop) tail) row target where
     makeAttribsRL _ r = do
         result <- makeAttribsRL (Proxy :: _ tail) r
         let thisStream = Record.get key r

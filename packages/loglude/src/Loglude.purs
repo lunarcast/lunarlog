@@ -37,6 +37,8 @@ module Loglude
     , module Data.Lens.Record
     , module Data.Lens.Lens.Tuple
     , module Data.Lens.Iso.Newtype
+    , module Effect.Aff
+    , module Data.Either
     , module Data.Newtype
     , module Type.Row
     , module Data.ZipperArray
@@ -60,7 +62,8 @@ import Data.Lens (Lens', Lens, Setter, Setter', Getter, Getter', over, set, prev
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Lens.Tuple (_1, _2)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..), fromMaybe, maybe, maybe')
+import Data.Maybe (Maybe(..), fromMaybe, maybe, maybe', isJust, isNothing)
+import Data.Either (Either(..), either, isLeft, isRight, note)
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
@@ -72,6 +75,7 @@ import Data.Undefined.NoProblem (Opt, fromOpt, opt)
 import Data.Vec (Vec, vec2)
 import Data.ZipperArray (ZipperArray)
 import Effect (Effect)
+import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Ref (Ref)
 import Foreign (Foreign)
