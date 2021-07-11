@@ -2,31 +2,17 @@ module Lunarlog.Client.VisualGraph.Render where
 
 import Loglude
 
-import Effect.Unsafe (unsafePerformEffect)
 import Geometry (Axis(..), Geometry, CanvasMouseEvent)
 import Geometry as Geometry
+import Geometry.Shapes.Effectful as Effectful
 import Geometry.Shapes.Flex (FlexLayout)
 import Geometry.Shapes.Flex as Flex
 import Geometry.TextBaseline as TextBaseline
 import Geometry.Transform as Transform
 import Graphics.Canvas (Context2D)
-import Loglude.Cancelable as Cancelable
-import Loglude.ReactiveRef as RR
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..), PatternArgument(..), PinId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-
-foreign import shellGeometry :: forall a. Effect (Geometry a)
-foreign import writeGeometry :: forall a. Geometry a -> Geometry a -> Effect Unit
-
-withStream :: forall a r b. ReactiveRef r b -> (b -> Geometry a) -> Geometry a
-withStream stream build = unsafePerformEffect $ Cancelable.perform do
-    shell <- liftEffect shellGeometry
-    let mapped = stream <#> build
-    initial <- liftEffect $ RR.read mapped
-    liftEffect $ writeGeometry initial shell
-    Cancelable.subscribe (RR.changes mapped) \input -> writeGeometry input shell
-    pure shell
 
 ---------- Constants
 patternBackground :: String
@@ -66,7 +52,7 @@ data PinSide = LeftPin | RightPin
 ---------- Implementation
 renderPattern :: Ask Context2D => VisualGraph.Pattern -> NodeGraph.Pattern -> Geometry PatternAction
 renderPattern { position: ref } pattern = 
-    withStream ref \position -> 
+    Effectful.withReactiveRef ref \position -> 
         Geometry.transformed
             { transform: Transform.translate position
             , onClick: const $ SelectNode $ NodeId 0

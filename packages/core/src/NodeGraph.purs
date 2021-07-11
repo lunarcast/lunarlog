@@ -2,7 +2,6 @@ module Lunarlog.Core.NodeGraph where
 
 import Loglude
 
-
 newtype NodeId = NodeId Int
 newtype PinId = PinId Int
 
@@ -19,8 +18,8 @@ data Node
     | Unify PinId
 
 newtype Rule = Rule
-    { head :: Pattern
-    , body :: HashMap NodeId Node
+    { head :: NodeId
+    , nodes :: HashMap NodeId Node
     , connections :: HashMap PinId PinId }
 
 data LunarlogType
