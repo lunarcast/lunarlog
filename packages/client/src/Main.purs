@@ -18,4 +18,4 @@ main = do
 
         Cancelable.perform do
             pattern <- myVisualPattern
-            launchTea $ scene ctx pattern
+            provide ctx $ launchTea $ scene pattern

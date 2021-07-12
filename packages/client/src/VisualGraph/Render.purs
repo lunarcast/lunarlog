@@ -2,14 +2,15 @@ module Lunarlog.Client.VisualGraph.Render where
 
 import Loglude
 
-import Geometry (Axis(..), Geometry, CanvasMouseEvent)
+import Debug (spy)
+import Geometry (Axis(..), CanvasMouseEvent, Geometry)
 import Geometry as Geometry
-import Geometry.Shapes.Effectful as Effectful
 import Geometry.Shapes.Flex (FlexLayout)
 import Geometry.Shapes.Flex as Flex
 import Geometry.TextBaseline as TextBaseline
 import Geometry.Transform as Transform
 import Graphics.Canvas (Context2D)
+import Loglude.ReactiveRef as RR
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..), PatternArgument(..), PinId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
@@ -50,15 +51,16 @@ data PatternAction
 data PinSide = LeftPin | RightPin
 
 ---------- Implementation
-renderPattern :: Ask Context2D => VisualGraph.Pattern -> NodeGraph.Pattern -> Geometry PatternAction
-renderPattern { position: ref } pattern = 
-    Effectful.withReactiveRef ref \position -> 
-        Geometry.transformed
+renderPattern :: Ask Context2D => VisualGraph.Pattern -> NodeGraph.Pattern -> ReadableRef (Geometry PatternAction)
+renderPattern { position } pattern = 
+    RR.readonly position <#> \position -> 
+        Geometry.transform
             { transform: Transform.translate position
             , onClick: const $ SelectNode $ NodeId 0
-            , target: inner }
+            , target: inner
+            }
     where
-    inner = Flex.withMinimumSize $ renderPatternLayout pattern 0.0
+    inner = spy "inner" $ Flex.withMinimumSize $ renderPatternLayout pattern 0.0
 
 renderPatternLayout :: Ask Context2D => NodeGraph.Pattern -> Number -> FlexLayout PatternAction
 renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
@@ -66,17 +68,19 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
     , stretchChildren: true
     , wrap: \child -> Geometry.aabbPadding
             { target: child
-            , weight: 3.0
             , amount: Geometry.fourWayPadding patternPadding itemSpacing 0.0 itemSpacing
-            , fill: patternBackground 
-            , stroke: patternStrokeColor
-            , onClick: const $ ClickedPin $ PinId 1000
+            , paddingModifiers:
+                { fill: patternBackground 
+                , stroke: patternStrokeColor
+                , weight: 3.0
+                , onClick: const $ ClickedPin $ PinId 1000
+                }
             }
     , children: 
         [ Flex.IsLayout $ Flex.createFlexLayout
             { flexAxis: X
             , enforceSize: true
-            , children: pure $ Flex.NotLayout $ Geometry.aabbPadding
+            , children: [ Flex.NotLayout $ Geometry.aabbPadding
                 { target: Geometry.text
                     { position: zero
                     , text: name 
@@ -85,7 +89,7 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
                     , baseline: TextBaseline.top
                     }
                 , amount: Geometry.fourWayPadding 0.0 0.0 patternPadding 0.0
-                }
+                }]
             }
         ] <> argumentGeometries
     }
@@ -99,14 +103,14 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
             }  
         NestedPattern pattern -> Flex.IsLayout $ Flex.wrapLayout withSpacing $ renderPatternLayout pattern $ offset + patternPadding
 
-withSpacing :: forall a. Geometry a -> Geometry a
+withSpacing :: forall a. Ask Context2D => Geometry a -> Geometry a
 withSpacing target = Geometry.aabbPadding
     { target
     , amount: Geometry.fourWayPadding 0.0 itemSpacing 0.0 0.0
     }
 
-pin :: PinId -> PinSide -> Number -> Geometry PatternAction
-pin id side extraOffset = Geometry.transformed 
+pin :: Ask Context2D => PinId -> PinSide -> Number -> Geometry PatternAction
+pin id side extraOffset = Geometry.transform
     { target: withSpacing $ Geometry.circle
         { radius: pinRadius
         , position: zero

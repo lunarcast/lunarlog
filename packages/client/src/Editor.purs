@@ -4,11 +4,9 @@ import Loglude
 
 import Control.Plus (empty)
 import Data.MouseButton (nothingPressed)
-import Debug (spy)
 import Effect.Class.Console (log)
 import FRP.Stream as Stream
 import Geometry (Geometry, Tea, Vec2)
-import Geometry as Geometry
 import Geometry.Tea (createMouseEvent, eventStream)
 import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
@@ -70,10 +68,9 @@ myVisualPattern :: Cancelable (VisualGraph.Pattern)
 myVisualPattern = { position: _ } <$> writeable (vec2 100.0 200.0)
 
 ---------- Implementation
-scene :: Context2D -> VisualGraph.Pattern -> Tea EditorState MyAction
-scene context pattern = 
-    { context
-    , initialState: { pattern, selection: NoSelection, mouseMove: empty, mousePosition: zero }
+scene :: Ask Context2D => VisualGraph.Pattern -> Tea EditorState MyAction
+scene pattern =
+    { initialState: { pattern, selection: NoSelection, mouseMove: empty, mousePosition: zero }
     , render
     , handleAction
     , setup
@@ -108,7 +105,7 @@ scene context pattern =
             -- liftEffect $ RR.modify ((+) (vec2 20.0 20.0)) position
             log $ "Selected " <> show nodeId
 
-    render :: Ask Context2D => _ -> Geometry _
-    render { pattern } = spy "geometry" $ Geometry.group { children: [geom], onClick: const $ ClickedPin $ PinId 700 }
-        where
-        geom = renderPattern pattern myPattern
+    render :: Ask Context2D => ReadableRef _ -> ReadableRef (Geometry _)
+    render state = do
+        { pattern } <- state
+        renderPattern pattern myPattern
