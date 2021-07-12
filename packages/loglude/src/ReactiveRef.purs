@@ -8,12 +8,17 @@ module Loglude.ReactiveRef
     , changes
     , writeable
     , readonly
-    , fromStream ) where
+    , fromStream
+    , mapChanges
+    , mapUsingStream
+    , dropDuplicates
+    ) where
 
 import Prelude
 
 import Control.Plus (empty)
-import Data.Lens (Lens', view)
+import Data.Aged as Aged
+import Data.Lens (Lens', over, view)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
@@ -62,12 +67,27 @@ writeable initial = do
 readonly :: forall r. ReactiveRef r ~> ReadableRef
 readonly (ReactiveRef { read, changes }) = ReactiveRef { read, changes }
 
+-- | Modify the change detection stream.
+mapChanges :: forall r a. (Stream.Discrete a -> Stream.Discrete a) -> ReactiveRef r a -> ReactiveRef r a
+mapChanges = over _changes
+
+-- | More or less map combined with mapChanges
+mapUsingStream :: forall a b. (a -> b) -> (Stream.Discrete a -> Stream.Discrete b) -> ReadableRef a -> ReadableRef b
+mapUsingStream mapRead mapChanges (ReactiveRef { read, changes }) = ReactiveRef
+    { read: mapRead <$> read
+    , changes: mapChanges changes
+    }
+
+-- | Reactive ref analogue of Aged.dropDuplicates
+dropDuplicates :: forall a. ReadableRef (Aged.Aged a) -> ReadableRef a
+dropDuplicates = mapUsingStream Aged.get Aged.dropDuplicates
+
 ---------- Typeclass instances
 coerceRef :: forall r. TypeEquals r () => ReactiveRef () ~> ReactiveRef r
 coerceRef = unsafeCoerce
 
 derive instance Newtype (ReactiveRef r a) _
-
+-- TODO: investigate this potentially doing twice the work
 derive instance Functor (ReactiveRef r)
 
 instance TypeEquals r () => Apply (ReactiveRef r) where
