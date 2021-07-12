@@ -51,16 +51,16 @@ data PatternAction
 data PinSide = LeftPin | RightPin
 
 ---------- Implementation
-renderPattern :: Ask Context2D => VisualGraph.Pattern -> NodeGraph.Pattern -> ReadableRef (Geometry PatternAction)
-renderPattern { position } pattern = 
-    RR.readonly position <#> \position -> 
+renderPattern :: Ask Context2D => VisualGraph.Pattern -> ReadableRef (NodeGraph.Pattern) -> ReadableRef (Geometry PatternAction)
+renderPattern { position } patterns = do
+    inner <- patterns <#> \pattern -> spy "inner" $ Flex.withMinimumSize $ renderPatternLayout pattern 0.0
+
+    RR.readonly position # RR.dropDuplicates <#> \position -> 
         Geometry.transform
             { transform: Transform.translate position
             , onClick: const $ SelectNode $ NodeId 0
             , target: inner
             }
-    where
-    inner = spy "inner" $ Flex.withMinimumSize $ renderPatternLayout pattern 0.0
 
 renderPatternLayout :: Ask Context2D => NodeGraph.Pattern -> Number -> FlexLayout PatternAction
 renderPatternLayout { name, arguments } offset = Flex.createFlexLayout

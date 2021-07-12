@@ -2,11 +2,12 @@ module Lunarlog.Client.VisualGraph.Types where
 
 import Loglude
 
+import Data.Aged (Aged)
 import Geometry.Vector (Vec2)
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 
 type Pattern =
-    { position :: WriteableRef Vec2 }
+    { position :: WriteableRef (Aged Vec2) }
 
 data Node
    = PatternNode Pattern

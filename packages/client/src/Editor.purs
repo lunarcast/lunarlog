@@ -3,6 +3,8 @@ module Lunarlog.Editor where
 import Loglude
 
 import Control.Plus (empty)
+import Data.Aged (Aged, aged)
+import Data.Aged as Aged
 import Data.MouseButton (nothingPressed)
 import Effect.Class.Console (log)
 import FRP.Stream as Stream
@@ -29,7 +31,8 @@ data Selection
     | NoSelection
 
 type EditorState = 
-    { pattern :: VisualGraph.Pattern
+    { pattern :: Aged VisualGraph.Pattern
+    , nestedPattern :: Aged NodeGraph.Pattern
     , selection :: Selection
     , mouseMove :: Stream.Discrete MouseEvent
     , mousePosition :: Vec2 }
@@ -39,7 +42,7 @@ _selection :: Lens' EditorState Selection
 _selection = prop (Proxy :: _ "selection")
 
 _pattern :: Lens' EditorState VisualGraph.Pattern
-_pattern = prop (Proxy :: _ "pattern")
+_pattern = prop (Proxy :: _ "pattern") <<< Aged._aged
 
 _mousePosition :: Lens' EditorState Vec2
 _mousePosition = prop (Proxy :: _ "mousePosition")
@@ -65,12 +68,17 @@ myPattern =
     }
 
 myVisualPattern :: Cancelable (VisualGraph.Pattern)
-myVisualPattern = { position: _ } <$> writeable (vec2 100.0 200.0)
+myVisualPattern = { position: _ } <$> writeable (Aged.aged $ vec2 100.0 200.0)
 
 ---------- Implementation
 scene :: Ask Context2D => VisualGraph.Pattern -> Tea EditorState MyAction
 scene pattern =
-    { initialState: { pattern, selection: NoSelection, mouseMove: empty, mousePosition: zero }
+    { initialState: 
+        { pattern: aged pattern
+        , nestedPattern: aged myPattern
+        , selection: NoSelection
+        , mouseMove: empty
+        , mousePosition: zero }
     , render
     , handleAction
     , setup
@@ -97,15 +105,13 @@ scene pattern =
                 NoSelection -> pure unit
                 SelectedNode _ -> do
                     let delta = event.worldPosition - oldPosition
-                    pattern <- get <#> view _pattern
-                    liftEffect $ RR.modify ((+) delta) pattern.position
+                    liftEffect $ RR.modify (over Aged._aged $ (+) delta) pattern.position
         SelectNode nodeId -> do
             modify $ set _selection $ SelectedNode nodeId
-            { position } <- get <#> view _pattern 
-            -- liftEffect $ RR.modify ((+) (vec2 20.0 20.0)) position
             log $ "Selected " <> show nodeId
 
     render :: Ask Context2D => ReadableRef _ -> ReadableRef (Geometry _)
     render state = do
-        { pattern } <- state
-        renderPattern pattern myPattern
+        pattern <- state <#> _.pattern # RR.dropDuplicates
+        let myPatternStream = state <#> _.nestedPattern # RR.dropDuplicates
+        renderPattern pattern myPatternStream
