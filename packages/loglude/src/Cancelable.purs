@@ -63,7 +63,7 @@ pull stream = Aff.makeAff \continue -> do
     ref <- Ref.new (pure unit)
     canceler_ <- Stream.subscribe stream \value -> do
         continue $ Right value
-        Ref.read ref
+        join $ Ref.read ref
     Ref.write canceler_ ref
     pure $ Aff.Canceler $ const $ liftEffect canceler_
 
