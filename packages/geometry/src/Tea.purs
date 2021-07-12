@@ -133,10 +133,9 @@ handleActions propagateAction zipper = do
 launchTea :: forall state action. Ask Context2D => Tea state action -> Cancelable Unit
 launchTea tea = do
     dirty <- liftEffect $ Ref.new true
-    shouldRecompute <- liftEffect $ Ref.new true
     state <- RR.writeable tea.initialState
     let 
-        renderStream :: Ask Context2D => ReadableRef (Geometry action)
+        renderStream :: ReadableRef (Geometry action)
         renderStream = tea.render (RR.readonly state)
 
     let propagateAction action = do 
@@ -144,7 +143,7 @@ launchTea tea = do
           currentGeometry <- RR.read renderStream
           result <- runTea currentState currentGeometry $ tea.handleAction action
           RR.write result.state state
-          Ref.write true dirty
+          --Ref.write true shouldRecompute
           pure result.continuePropagation
 
     let propagateActions actions = for_ (ZipperArray.fromArray actions) $ handleActions propagateAction
@@ -153,7 +152,6 @@ launchTea tea = do
           Ref.read dirty >>= flip when do
             clearRect ask { x: 0.0, y: 0.0, width: 1000.0, height: 1000.0 }
             RR.read renderStream >>= render ask
-
             Ref.write false dirty
 
     Cancelable.subscribe raf loop
@@ -170,7 +168,6 @@ launchTea tea = do
         propagateActions $ dispatchEvent (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
 
     tea.setup { propagateAction: propagateAction >>> void }
-    liftEffect $ Ref.write true dirty
     where
     clicks = eventStream MouseEvent.fromEvent EventType.click
     mousedown = eventStream MouseEvent.fromEvent EventType.mousedown
