@@ -9,14 +9,15 @@ module Geometry.Shapes.Padding
 
 import Loglude
 
+import Data.Undefined.NoProblem.Closed as Closed
 import Data.Vec as Vec
-import Geometry.Base (type (<+>), AllAttributes, Attributes, FullGeometryConstructor, GenericGeometryAttributes, Geometry, GeometryAttributes, group, rect)
-import Geometry.Hiccup (bounds, translate)
-import Geometry.Shapes.Effectful (effectful)
+import Geometry.Base (Attributes, Geometry(..), GeometryAttributes, bounds, group, rect, translate)
 import Geometry.Vector (Vec2)
+import Graphics.Canvas (Context2D)
+import Loglude as Opt
 import Record as Record
-import Record.Unsafe.Union (unsafeUnion)
 
+---------- Types
 type Padding = Vec D4 Number
 
 -- | Fixed child keeps the corner of the child where it was before
@@ -24,11 +25,14 @@ type Padding = Vec D4 Number
 data PaddingPlacement = FixedChild | FixedCorner
 
 type PaddingAttributes :: Attributes
-type PaddingAttributes r a = ( target :: Geometry a, amount :: Padding | r )
+type PaddingAttributes a r = 
+    ( target :: Geometry a
+    , amount :: Padding
+    , paddingPlacement :: Opt PaddingPlacement
+    , paddingModifiers :: Opt (Record (GeometryAttributes a ()))
+    | r )
 
-type OptionalPaddingAttributes :: Attributes
-type OptionalPaddingAttributes r a = ( paddingPlacement :: PaddingPlacement | r )
-
+---------- Constructors
 equalPadding :: Number -> Padding
 equalPadding = Vec.replicate d4
 
@@ -38,30 +42,39 @@ xyPadding a = a `Vec.concat` a
 fourWayPadding :: Number -> Number -> Number -> Number -> Padding
 fourWayPadding a b c d = Vec.cons a $ Vec.cons b $ Vec.cons c $ Vec.cons d Vec.empty
 
-defaults :: forall a. AllAttributes OptionalPaddingAttributes a
-defaults = { paddingPlacement: FixedCorner }
+aabbPadding :: 
+    forall given action. 
+    Ask Context2D => 
+    Closed.Coerce given (Record (PaddingAttributes action ())) => 
+    given -> 
+    Geometry action
+aabbPadding = Closed.coerce >>>  _aabbPadding
 
-_aabbPadding :: forall a. Record ((PaddingAttributes <+> OptionalPaddingAttributes) (GenericGeometryAttributes Opt a) a) -> Geometry a
-_aabbPadding attributes = effectful $ bounds attributes.target <#> \{ position, size } -> do
-    let amountTopLeft = Vec.take d2 attributes.amount
-    let amountBottomRight = Vec.drop d2 attributes.amount
-
-    -- | The amount we shift all the children by
-    let process = case attributes.paddingPlacement of
-         FixedCorner -> translate amountTopLeft
-         FixedChild -> identity
-
+---------- Implementation
+_aabbPadding :: 
+    forall action. 
+    Ask Context2D =>
+    Record (PaddingAttributes action ()) -> 
+    Geometry action
+_aabbPadding attributes =
     process $ group
         { children: 
-            [ rect $ flip Record.merge (unsafeCoerce attributes :: Record (GeometryAttributes a))
-                { position: position - amountTopLeft
-                , size: size + amountTopLeft + amountBottomRight
-                , label: "Padding"
-                } 
+            [ case bounds attributes.target of
+                Just { position, size } -> rect $ Record.merge (Opt.fromOpt (Closed.coerce {}) attributes.paddingModifiers)
+                    { position: position - amountTopLeft
+                    , size: size + amountTopLeft + amountBottomRight
+                    , label: "Padding"
+                    } 
+                Nothing -> None zero
             , attributes.target
             ]
         , label: "Padding container"
         }
+    where
+    -- | The amount we shift all the children by
+    process = case fromOpt FixedCorner attributes.paddingPlacement of
+        FixedCorner -> translate amountTopLeft
+        FixedChild -> identity
 
-aabbPadding :: forall a. FullGeometryConstructor OptionalPaddingAttributes PaddingAttributes a
-aabbPadding attribs = unsafeUnion (unsafeCoerce attribs) defaults # _aabbPadding
+    amountTopLeft = Vec.take d2 attributes.amount
+    amountBottomRight = Vec.drop d2 attributes.amount

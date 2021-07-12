@@ -1,24 +1,16 @@
 module Geometry 
     ( module Geometry.Base
-    , module Geometry.Hiccup
     , module Geometry.Tea
     , module Geometry.TextBaseline
     , module Geometry.Transform
     , module Geometry.Vector
-    , module Geometry.Shapes.Text
     , module Geometry.Shapes.Padding
     , module Graphics.Canvas
-    , module Geometry.Shapes.None
-    , module Geometry.Shapes.Transformed
     ) where
 
 import Geometry.Base
 
-import Geometry.Hiccup (class GeometryWrapper, class Hiccup, class IsAABB, bounds, buildGeometryBlueprint, pointInside, pointInsideAABB, toAABB, toHiccup, translate, translateByLens, unwrapGeometry)
-import Geometry.Shapes.None (none)
-import Geometry.Shapes.Transformed (Transformed(..), transformed)
 import Geometry.Shapes.Padding (Padding, PaddingPlacement, aabbPadding, equalPadding, fourWayPadding, xyPadding)
-import Geometry.Shapes.Text (CustomTextAttributes, text)
 import Geometry.Tea (SetupArgs, Tea, launchTea)
 import Geometry.TextBaseline (TextBaseline)
 import Geometry.Transform (TransformMatrix(..))
