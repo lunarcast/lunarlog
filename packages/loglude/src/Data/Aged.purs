@@ -45,12 +45,11 @@ dropDuplicates :: forall a. Stream.Discrete (Aged a) -> Stream.Discrete a
 dropDuplicates = Stream.withLast >>> filterMap hasChanged
     where
     hasChanged { last, now } 
-        | isNothing last || last /= Just now = Just $ get now
+        | isNothing last || last `differentAges` now = Just $ get now
         | otherwise = Nothing
 
----------- Typeclass isntances
-instance Eq (Aged a) where
-    eq (Aged a) (Aged b) = a.age == b.age
+    differentAges (Just (Aged a)) (Aged b) = a.age /= b.age
+    differentAges Nothing _ = true 
 
 ---------- Foreign imports
 foreign import now :: Effect Number
