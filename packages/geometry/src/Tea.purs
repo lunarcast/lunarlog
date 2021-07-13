@@ -133,7 +133,7 @@ handleActions propagateAction zipper = do
 launchTea :: forall state action. Ask Context2D => Tea state action -> Cancelable Unit
 launchTea tea = do
     dirty <- liftEffect $ Ref.new true
-    state <- RR.writeable tea.initialState
+    state <- liftEffect $ RR.writeable tea.initialState
     let 
         renderStream :: ReadableRef (Geometry action)
         renderStream = tea.render (RR.readonly state)
@@ -143,7 +143,6 @@ launchTea tea = do
           currentGeometry <- RR.read renderStream
           result <- runTea currentState currentGeometry $ tea.handleAction action
           RR.write result.state state
-          --Ref.write true shouldRecompute
           pure result.continuePropagation
 
     let propagateActions actions = for_ (ZipperArray.fromArray actions) $ handleActions propagateAction
