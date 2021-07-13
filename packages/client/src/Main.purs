@@ -17,5 +17,5 @@ main = do
         let zoom = 2.0
 
         Cancelable.perform do
-            pattern <- myVisualPattern
+            pattern <- liftEffect myVisualPattern
             provide ctx $ launchTea $ scene pattern

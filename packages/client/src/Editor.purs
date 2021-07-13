@@ -67,7 +67,7 @@ myPattern =
         ] 
     }
 
-myVisualPattern :: Cancelable (VisualGraph.Pattern)
+myVisualPattern :: Effect (VisualGraph.Pattern)
 myVisualPattern = { position: _ } <$> writeable (Aged.aged $ vec2 100.0 200.0)
 
 ---------- Implementation
@@ -112,6 +112,6 @@ scene pattern =
 
     render :: Ask Context2D => ReadableRef _ -> ReadableRef (Geometry _)
     render state = do
-        pattern <- state <#> _.pattern # RR.dropDuplicates
         let myPatternStream = state <#> _.nestedPattern # RR.dropDuplicates
+        pattern <- state <#> _.pattern # RR.dropDuplicates
         renderPattern pattern myPatternStream

@@ -11,6 +11,8 @@
   , "record"
   , "web-html"
   , "debug"
+  , "control"
+  , "run"
   , "lunarlog-prelude"
   , "lunarlog-geometry"
   , "lunarlog-core"
