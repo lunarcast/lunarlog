@@ -14,6 +14,8 @@ module Geometry.Vector
     , rmapAxis
     , bimapAxis
     , buildFromAxis
+    , greaterThan
+    , smallerThan
     , _insideVector
     , _x
     , _y
@@ -40,6 +42,12 @@ toTuple vec = (vec !! d0) /\ (vec !! d1)
 
 fromTuple :: forall a. a /\ a -> Vec D2 a
 fromTuple = uncurry vec2
+
+smallerThan :: Vec2 -> Vec2 -> Boolean
+smallerThan a b = x a < x b && y a < y b
+
+greaterThan :: Vec2 -> Vec2 -> Boolean
+greaterThan a b = x a > x b && y a > y b
 
 ---------- Stuff related to axis
 data Axis = X | Y

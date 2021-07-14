@@ -3,7 +3,7 @@ module Geoemtry.Data.AABB where
 import Loglude
 
 import Data.Vec as Vec
-import Geometry.Vector (Vec2, x, y)
+import Geometry.Vector (Vec2, x, y, smallerThan, greaterThan)
 import Graphics.Canvas (Rectangle)
 
 ---------- Types
@@ -32,7 +32,7 @@ union a b = fromMinMax
 
 -- | Calculate wether a point is inside a rect
 pointInside :: Vec2 -> AABB -> Boolean
-pointInside point { position, size } = point > position && point < position + size
+pointInside point { position, size } = point `greaterThan` position && point `smallerThan` (position + size)
 
 -- | Calculates the bounds of a polygon. Returns Nothing if the point array is empty
 fromPoints :: Array Vec2 -> Maybe AABB
