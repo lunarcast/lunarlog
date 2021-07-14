@@ -3,7 +3,7 @@ module Lunarlog.Client.VisualGraph.Render where
 import Loglude
 
 import Debug (spy)
-import Geometry (Axis(..), CanvasMouseEvent, Geometry)
+import Geometry (Axis(..), Geometry)
 import Geometry as Geometry
 import Geometry.Shapes.Flex (FlexLayout)
 import Geometry.Shapes.Flex as Flex
@@ -12,8 +12,9 @@ import Geometry.Transform as Transform
 import Graphics.Canvas (Context2D)
 import Loglude.ReactiveRef as RR
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
-import Lunarlog.Core.NodeGraph (NodeId(..), PatternArgument(..), PinId(..))
+import Lunarlog.Core.NodeGraph (PatternArgument(..), PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
+import Lunarlog.Editor.Types (PatternAction(..))
 
 ---------- Constants
 patternBackground :: String
@@ -41,23 +42,15 @@ pinRadius :: Number
 pinRadius = 15.0
 
 ---------- Types
-data PatternAction 
-    = ClickedPin PinId
-    | SelectNode NodeId
-    | MouseMove CanvasMouseEvent
-    | MouseUp CanvasMouseEvent
-    | RefreshSelection CanvasMouseEvent
-
 data PinSide = LeftPin | RightPin
 
 ---------- Implementation
-renderPattern :: Ask Context2D => VisualGraph.Pattern -> ReadableRef (NodeGraph.Pattern) -> ReadableRef (Geometry PatternAction)
-renderPattern { position } patterns = ado
-    inner <- patterns <#> \pattern -> spy "inner" $ Flex.withMinimumSize $ renderPatternLayout pattern 0.0
+renderPattern :: Ask Context2D => VisualGraph.Pattern -> NodeGraph.Pattern -> ReadableRef (Geometry PatternAction)
+renderPattern { position } pattern = ado
+    let inner = spy "inner" $ Flex.withMinimumSize $ renderPatternLayout pattern 0.0
     position <- RR.readonly position # RR.dropDuplicates
     in Geometry.transform
         { transform: Transform.translate position
-        , onClick: const $ SelectNode $ NodeId 0
         , target: inner
         }
 
@@ -72,7 +65,7 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
                 { fill: patternBackground 
                 , stroke: patternStrokeColor
                 , weight: 3.0
-                , onClick: const $ ClickedPin $ PinId 1000
+                , onClick: const SelectNode
                 }
             }
     , children: 
@@ -100,7 +93,10 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
             , arrangeChildren: Flex.SpaceBetween
             , children: [ Flex.NotLayout $ pin id LeftPin $ -offset, Flex.NotLayout $ pin id RightPin 0.0 ]
             }  
-        NestedPattern pattern -> Flex.IsLayout $ Flex.wrapLayout withSpacing $ renderPatternLayout pattern $ offset + patternPadding
+        NestedPattern pattern -> Flex.IsLayout
+            $ Flex.wrapLayout (withSpacing >>> Geometry.mapAction (NestedPatternAction pattern.id))
+            $ renderPatternLayout pattern
+            $ offset + patternPadding
 
 withSpacing :: forall a. Ask Context2D => Geometry a -> Geometry a
 withSpacing target = Geometry.aabbPadding
