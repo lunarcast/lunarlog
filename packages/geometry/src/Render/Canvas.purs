@@ -4,7 +4,7 @@ import Loglude
 
 import Data.Undefined.NoProblem (isUndefined)
 import Geoemtry.Data.AABB (toCanvasRect)
-import Geometry.Base (Geometry(..), GeometryAttributes)
+import Geometry.Base (Geometry(..), GeometryAttributes, MapActionF(..))
 import Geometry.Transform (TransformMatrix)
 import Geometry.Vector (x, y)
 import Graphics.Canvas (Context2D, arc, beginPath, fill, fillRect, fillText, stroke, strokeRect, strokeText, withContext)
@@ -54,6 +54,7 @@ render context = case _ of
                 (y attributes.position)
         unless (isUndefined attributes.fill) $ renderText fillText
         unless (isUndefined attributes.stroke) $ renderText strokeText
+    MapAction existential -> existential # runExists \(MapActionF { target }) -> render context target
     None _ -> pure unit
 
 ---------- Foreign imports

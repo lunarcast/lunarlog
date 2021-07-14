@@ -30,6 +30,11 @@ type TextMetrics =
     , fontBoundingBoxAscent :: Number
     }
 
+newtype MapActionF to from = MapActionF 
+    { target :: Geometry from
+    , map :: from -> to
+    }
+
 data Geometry :: Type -> Type
 data Geometry action
     = Circle (Record (CircleAttributes action + GeometryAttributes action ()))
@@ -37,6 +42,7 @@ data Geometry action
     | Group (Record (GroupAttributes action + GeometryAttributes action ()))
     | Text (Record (TextAttributes action + GeometryAttributes action ()))
     | Transform (Record (TransformAttributes action + GeometryAttributes action ()))
+    | MapAction (Exists (MapActionF action))
     | None Vec2
 
 data ClickCheck
@@ -88,6 +94,7 @@ type TransformAttributes a r =
     , target :: Geometry a
     , transformBounds :: Opt Boolean
     | r )
+
 ---------- Constructor types
 type GeometryConstructor extra = 
     forall given action. 
@@ -114,8 +121,11 @@ transform = Closed.coerce >>> Transform
 text :: GeometryConstructor TextAttributes
 text = Closed.coerce >>> Text
 
+mapAction :: forall from to. (from -> to) -> Geometry from -> Geometry to
+mapAction map target = { target, map } # MapActionF # mkExists # MapAction
+
 ---------- Helpers
-translate :: Vec2 -> Geometry ~> Geometry
+translate :: forall action. Vec2 -> Geometry action -> Geometry action
 translate amount (Circle attributes) = 
     Circle $ over _position ((+) amount) attributes
 translate amount (Rect attributes) =
@@ -127,6 +137,10 @@ translate amount (Group attributes) =
 translate amount (Transform attributes)
     | Opt.fromOpt true attributes.transformBounds = Transform $ over _transform (_ <> Transform.translate amount) attributes
     | otherwise = Transform $ over _target (translate amount) attributes
+translate amount (MapAction existential) = MapAction $ mapExists mapInner existential
+    where
+    mapInner :: MapActionF action ~> MapActionF action
+    mapInner = over (_Newtype <<< _target) $ translate amount 
 translate amount (None position) = None (position + amount)
 
 -- | Calculate the minimum rectangle needed to surround the shape
@@ -155,6 +169,7 @@ bounds (Text attributes) = Just do
     { position: attributes.position
     , size: vec2 metrics.width (metrics.fontBoundingBoxAscent)
     }
+bounds (MapAction inner) = inner # runExists (unwrap >>> _.target >>> bounds)
 bounds (None position) = Just { position, size: zero }
 
 -- | Returns a polygon surrounding the shape
@@ -177,19 +192,21 @@ toLocalCoordinates (Transform { target, transform }) point = multiplyVector (inv
 toLocalCoordinates _ point = point
 
 -- | Get an array with all the children owned by a geometry
-children :: forall action. Geometry action -> Array (Geometry action)
-children (Group { children }) = children
-children (Transform { target }) = [target]
-children _ = []
+children :: forall action. Geometry action -> forall result. (forall subaction. (subaction -> action) -> Geometry subaction -> result) -> Array result
+children (Group { children }) f = f identity <$> children
+children (Transform { target }) f = [f identity target]
+children (MapAction existential) f = [existential # runExists \(MapActionF { target, map }) -> f map target]
+children _ _ = []
 
 -- | Get an existential with the attributes carried around by a geometry
-attributes :: forall action. Geometry action -> forall result. (forall r. Record (GeometryAttributes action r) -> result) -> result
-attributes (Circle attributes) f = f attributes
-attributes (Rect attributes) f = f attributes
-attributes (Group attributes) f = f attributes
-attributes (Text attributes) f = f attributes
-attributes (Transform attributes) f = f attributes
-attributes (None position) f = f $ (Closed.coerce {} :: Record (GeometryAttributes action ()))
+attributes :: forall action result. Geometry action -> result -> (forall r. Record (GeometryAttributes action r) -> result) -> result
+attributes (Circle attributes) _ f = f attributes
+attributes (Rect attributes) _ f = f attributes
+attributes (Group attributes) _ f = f attributes
+attributes (Text attributes) _ f = f attributes
+attributes (Transform attributes) _ f = f attributes
+attributes (None position) _ f = f $ (Closed.coerce {} :: Record (GeometryAttributes action ()))
+attributes (MapAction _) default _ = default
 
 ---------- Lenses
 _position :: forall r. Lens' { position :: Vec2 | r } Vec2
@@ -206,3 +223,6 @@ _target = prop (Proxy :: _ "target")
 
 ---------- Foreign imports
 foreign import measureText :: Context2D -> Opt String -> String -> TextMetrics
+
+---------- Typeclass instances
+derive instance Newtype (MapActionF t f) _

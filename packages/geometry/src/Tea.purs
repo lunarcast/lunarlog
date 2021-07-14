@@ -39,8 +39,8 @@ import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes (mousedown, mouseup, click) as EventType
 
 ---------- Types
-newtype EventCheckGenerator a = EventCheckGenerator (Geometry a -> EventChecker a)
-type EventChecker a = (Geometry a -> Maybe a) /\ EventCheckGenerator a
+newtype EventCheckGenerator action = EventCheckGenerator (forall zoom. Geometry zoom -> EventChecker action)
+type EventChecker action = (forall zoom. ((zoom -> action) -> Geometry zoom -> Maybe action) /\ EventCheckGenerator action)
 
 data TeaF action result
     = StopPropagation result
@@ -110,18 +110,24 @@ runTea state geometry = execState state >>> runTea >>> map asRecord >>> runBaseE
 checkMouseEvents :: 
     forall action. 
     Ask Context2D => 
-    (forall r. Record (GeometryAttributes action r) -> Opt (CanvasMouseEvent -> action)) -> 
+    (forall rest zoom. Record (GeometryAttributes zoom rest) -> Opt (CanvasMouseEvent -> zoom)) -> 
     CanvasMouseEvent -> 
     EventChecker action
-checkMouseEvents key event = check /\ EventCheckGenerator \geometry -> do
-    let newEvent = event { localPosition = toLocalCoordinates geometry event.localPosition }
-    checkMouseEvents key newEvent
+checkMouseEvents key event = result    
     where
-    check geom = case Opt.toMaybe $ attribs key of
-        Just handler | pointInside event.localPosition geom -> Just $ handler event
+    result :: EventChecker action
+    result = check /\ EventCheckGenerator recurse
+
+    check :: forall zoom. (zoom -> action) -> Geometry zoom -> Maybe action
+    check unzoom geom = case Opt.toMaybe $ attributes geom Opt.undefined key of
+        Just handler | pointInside event.localPosition geom -> Just $ unzoom $ handler event
         _ -> Nothing
-        where
-        attribs = attributes geom 
+
+    recurse :: forall zoom. Geometry zoom -> EventChecker action
+    recurse geometry = do
+        let newEvent = event { localPosition = toLocalCoordinates geometry event.localPosition }
+        checkMouseEvents key newEvent
+
 
 handleActions :: forall action. (action -> Effect Boolean) -> ZipperArray action -> Effect Unit
 handleActions propagateAction zipper = do
@@ -158,13 +164,13 @@ launchTea tea = do
         Ref.write true dirty
     Cancelable.subscribe mousedown \ev -> do
         currentGeometry <- RR.read renderStream
-        propagateActions $ dispatchEvent (checkMouseEvents _.onClick $ createMouseEvent ev) currentGeometry
+        propagateActions $ dispatchEvent identity (checkMouseEvents _.onClick $ createMouseEvent ev) currentGeometry
     Cancelable.subscribe mouseup \ev -> do
         currentGeometry <- RR.read renderStream
-        propagateActions $ dispatchEvent (checkMouseEvents _.onMouseup $ createMouseEvent ev) currentGeometry
+        propagateActions $ dispatchEvent identity (checkMouseEvents _.onMouseup $ createMouseEvent ev) currentGeometry
     Cancelable.subscribe clicks \ev -> do
         currentGeometry <- RR.read renderStream
-        propagateActions $ dispatchEvent (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
+        propagateActions $ dispatchEvent identity (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
 
     tea.setup { propagateAction: propagateAction >>> void }
     where
@@ -176,13 +182,12 @@ launchTea tea = do
     raf = animationFrame
 
 
-dispatchEvent :: forall a. EventChecker a -> Geometry a -> Array a
-dispatchEvent (check /\ EventCheckGenerator recurse) geometry = [Array.last nested, current <#> pure] >>= (fromMaybe [])
+dispatchEvent :: forall action zoomed. (zoomed -> action) -> EventChecker action -> Geometry zoomed -> Array action
+dispatchEvent unzoom (check /\ EventCheckGenerator recurse) geometry = [Array.last nested, current <#> pure] >>= (fromMaybe [])
     where
-    current = check geometry
+    current = check unzoom geometry
     continue = recurse geometry
-    nested = next 
-        <#> (\child -> dispatchEvent continue child)
+    nested = children geometry (\focus child -> dispatchEvent (focus >>> unzoom) continue child)
         # Array.filter (Array.null >>> not)
     next = children geometry
 
