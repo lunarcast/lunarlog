@@ -2,6 +2,8 @@ module Lunarlog.Core.NodeGraph where
 
 import Loglude
 
+import Data.Hashable (class Hashable)
+
 newtype NodeId = NodeId Int
 newtype PinId = PinId Int
 
@@ -11,7 +13,9 @@ data PatternArgument
 
 type Pattern =
     { name :: String
-    , arguments :: Array PatternArgument }
+    , id :: NodeId
+    , arguments :: Array PatternArgument
+    }
 
 data Node
     = PatternNode Pattern
@@ -45,6 +49,18 @@ type Module =
     { name :: Array String
     , declarations :: Array Declaration }
 
+---------- Lenses
+_ruleNodes :: Lens' Rule (HashMap NodeId Node)
+_ruleNodes = _Newtype <<< prop (Proxy :: _ "nodes")
+
 ---------- Typeclass instances
 derive newtype instance Show PinId
 derive newtype instance Show NodeId
+
+derive instance Eq NodeId
+derive instance Eq PinId
+
+derive newtype instance Hashable NodeId
+derive newtype instance Hashable PinId
+
+derive instance Newtype Rule _
