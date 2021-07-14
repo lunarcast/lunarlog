@@ -3,8 +3,9 @@ module Data.Aged
     , aged
     , get
     , set
-    , _aged
+    , map
     , dropDuplicates
+    , _aged
     ) where
 
 import Prelude
@@ -39,6 +40,10 @@ set = const aged
 -- | Increases the age when modified
 _aged :: forall a. Lens' (Aged a) a
 _aged = lens get set
+
+-- | I think the Functor instance isnt really lawful (map identity f != f), so this is the alternative
+map :: forall a b. (a -> b) -> Aged a -> Aged b
+map f (Aged { entity, age }) = Aged { entity: f entity, age  }
 
 -- | Filter a stream to block all consecutive values with the same age
 dropDuplicates :: forall a. Stream.Discrete (Aged a) -> Stream.Discrete a

@@ -50,22 +50,25 @@ module Loglude
     , module Run.Writer
     , module Loglude.ReactiveRef
     , module Math
+    , module Data.Exists
+    , module Loglude.Data.Exists
     , module Data.Tuple.Nested ) where
 
 import Prelude
 
 import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Either (Either(..), either, isLeft, isRight, note)
+import Data.Exists (Exists, mkExists, runExists)
+import Loglude.Data.Exists (mapExists)
 import Data.Foldable (class Foldable, foldMap, foldl, foldr, for_, sum)
 import Data.Generic.Rep (class Generic)
 import Data.HashMap (HashMap)
-import Math (tau, pi)
 import Data.Int (floor, toNumber, even, odd)
 import Data.Lens (Lens', Lens, Setter, Setter', Getter, Getter', over, set, preview, view, lens)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Lens.Tuple (_1, _2)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe, maybe, maybe', isJust, isNothing)
-import Data.Either (Either(..), either, isLeft, isRight, note)
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
@@ -89,6 +92,7 @@ import Loglude.Performance (now)
 import Loglude.ReactiveRef (ReactiveRef, ReadableRef, WriteableRef)
 import Loglude.RecordLike (class RecordLike)
 import Loglude.Types (Id, Const, Pair)
+import Math (tau, pi)
 import Prim.Row (class Union)
 import Prim.RowList (class RowToList, RowList)
 import Run (EFFECT, Run, AFF)
