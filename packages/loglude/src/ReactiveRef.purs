@@ -112,8 +112,20 @@ instance TypeEquals r () => Applicative (ReactiveRef r) where
 
 instance TypeEquals r () => Bind (ReactiveRef r) where
     bind (ReactiveRef r) f = coerceRef $ unsafePerformEffect do
+        let 
+          changeStream :: Stream.Discrete _
+          changeStream = Stream.makeEvent \emit -> do
+            (cancelInner :: Ref.Ref (Effect Unit)) <- Ref.new (pure unit)
+            cancelOuter <- Stream.subscribe (r.changes <#> f) \inner -> do
+                Ref.read cancelInner # join
+                read inner >>= emit
+                canceler <- Stream.subscribe (changes inner) emit
+                Ref.write canceler cancelInner
+            pure do
+                Ref.read cancelInner # join
+                cancelOuter
         initial <- r.read <#> f >>= read 
-        fromStream initial (r.changes `Stream.bind` (f >>> changes))
+        fromStream initial changeStream
     
 instance TypeEquals r () => Monad (ReactiveRef r)
 
