@@ -90,8 +90,19 @@ instance TypeEquals r () => Functor (ReactiveRef r) where
 
 instance TypeEquals r () => Apply (ReactiveRef r) where
     apply (ReactiveRef f) (ReactiveRef a) = coerceRef $ unsafePerformEffect do
+        let 
+          changes = Stream.makeEvent \emit -> do
+            latestFunction <- f.read >>= Ref.new
+            latestArgument <- a.read >>= Ref.new
+            cancelFunction <- Stream.subscribe f.changes \function -> do
+                Ref.write function latestFunction
+                Ref.read latestArgument >>= (function >>> emit)
+            cancelArgument <- Stream.subscribe a.changes \argument -> do
+                Ref.write argument latestArgument
+                Ref.read latestFunction >>= \function -> emit (function argument)
+            pure (cancelFunction *> cancelArgument)
         initial <- f.read <*> a.read
-        fromStream initial (f.changes <*> a.changes)
+        fromStream initial changes
 
 instance TypeEquals r () => Applicative (ReactiveRef r) where
     pure a = coerceRef $ ReactiveRef
