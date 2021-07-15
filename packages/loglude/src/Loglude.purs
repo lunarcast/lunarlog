@@ -52,6 +52,8 @@ module Loglude
     , module Math
     , module Data.Exists
     , module Loglude.Data.Exists
+    , module Data.Profunctor.Strong
+    , module Data.Hashable
     , module Data.Tuple.Nested ) where
 
 import Prelude
@@ -59,17 +61,18 @@ import Prelude
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Either (Either(..), either, isLeft, isRight, note)
 import Data.Exists (Exists, mkExists, runExists)
-import Loglude.Data.Exists (mapExists)
 import Data.Foldable (class Foldable, foldMap, foldl, foldr, for_, sum)
 import Data.Generic.Rep (class Generic)
 import Data.HashMap (HashMap)
+import Data.Hashable (class Hashable)
 import Data.Int (floor, toNumber, even, odd)
-import Data.Lens (Lens', Lens, Setter, Setter', Getter, Getter', over, set, preview, view, lens)
+import Data.Lens (Lens', Lens, Prism', Setter, Setter', Getter, Getter', over, set, preview, view, lens, prism')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Lens.Tuple (_1, _2)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe, maybe, maybe', isJust, isNothing)
 import Data.Newtype (class Newtype, unwrap, wrap)
+import Data.Profunctor.Strong ((&&&), (***), class Strong, first, second, fanout, splitStrong)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
 import Data.Traversable (class Traversable, traverse_, traverse)
@@ -87,6 +90,7 @@ import Foreign (Foreign)
 import Foreign.Object (Object)
 import Loglude.Ask (class Ask, ask, provide)
 import Loglude.Cancelable (Cancelable)
+import Loglude.Data.Exists (mapExists)
 import Loglude.MutableRecord (MutableRecord)
 import Loglude.Performance (now)
 import Loglude.ReactiveRef (ReactiveRef, ReadableRef, WriteableRef)
