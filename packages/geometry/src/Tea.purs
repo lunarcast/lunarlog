@@ -19,6 +19,7 @@ import Data.MouseButton (MouseButtons(..))
 import Data.Undefined.NoProblem as Opt
 import Data.ZipperArray as ZipperArray
 import Data.ZipperArray as Zipperrry
+import Debug (traceM)
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
@@ -161,6 +162,7 @@ launchTea tea = do
 
     Cancelable.subscribe raf loop
     Cancelable.subscribe (RR.changes renderStream) \_ -> do
+        traceM "rerender"
         Ref.write true dirty
     Cancelable.subscribe mousedown \ev -> do
         currentGeometry <- RR.read renderStream

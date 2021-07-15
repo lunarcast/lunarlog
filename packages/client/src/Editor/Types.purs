@@ -4,20 +4,19 @@ import Loglude
 
 import Data.Aged (Aged)
 import Data.Aged as Aged
+import Data.Array.NonEmpty as NonEmptyArray
 import FRP.Stream as Stream
 import Geometry (Vec2, CanvasMouseEvent)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
-import Lunarlog.Core.NodeGraph (NodeId, PinId)
+import Lunarlog.Core.NodeGraph (NodeId)
 import Lunarlog.Core.NodeGraph as NodeGraph
 
 ---------- Types
 data PatternAction
-    = ClickedPin PinId
-    | SelectNode
-    | NestedPatternAction NodeId PatternAction
+    = SelectNode (NonEmptyArray NodeId)
 
 data EditorAction
-    = NodeAction NodeId PatternAction
+    = NodeAction PatternAction
     | RefreshSelection CanvasMouseEvent
     | MouseMove CanvasMouseEvent
     | MouseUp CanvasMouseEvent
@@ -33,6 +32,10 @@ type EditorState =
     , mouseMove :: Stream.Discrete MouseEvent
     , mousePosition :: Vec2
     }
+
+---------- Helpers
+patternActionWithParent :: NodeId -> PatternAction -> PatternAction
+patternActionWithParent parent (SelectNode path) = SelectNode (path `NonEmptyArray.snoc` parent)
 
 ---------- Lenses
 _selection :: Lens' EditorState Selection

@@ -12,9 +12,9 @@ import Geometry.Transform as Transform
 import Graphics.Canvas (Context2D)
 import Loglude.ReactiveRef as RR
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
-import Lunarlog.Core.NodeGraph (PatternArgument(..), PinId)
+import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (PatternAction(..))
+import Lunarlog.Editor.Types (PatternAction(..), patternActionWithParent)
 
 ---------- Constants
 patternBackground :: String
@@ -44,18 +44,38 @@ pinRadius = 15.0
 ---------- Types
 data PinSide = LeftPin | RightPin
 
+type RenderPatternInput =
+    { lookupPattern :: NodeId -> Maybe NodeGraph.Node
+    , pattern :: NodeGraph.Pattern
+    , visualPattern :: VisualGraph.Pattern
+    , nodeId :: NodeId
+    }
+
+type RenderNestedPatternInput =
+    { lookupPattern :: NodeId -> Maybe NodeGraph.Node
+    , pattern :: NodeGraph.Pattern
+    , offset :: Number
+    , nodeId :: NodeId
+    }
+
 ---------- Implementation
-renderPattern :: Ask Context2D => VisualGraph.Pattern -> NodeGraph.Pattern -> ReadableRef (Geometry PatternAction)
-renderPattern { position } pattern = ado
-    let inner = spy "inner" $ Flex.withMinimumSize $ renderPatternLayout pattern 0.0
-    position <- RR.readonly position # RR.dropDuplicates
+renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry PatternAction)
+renderPattern { lookupPattern, pattern, visualPattern, nodeId } = ado
+    let 
+      inner = spy "inner" $ Flex.withMinimumSize $ renderPatternLayout 
+        { lookupPattern
+        , pattern
+        , offset: 0.0
+        , nodeId
+        }
+    position <- RR.readonly visualPattern.position # RR.dropDuplicates
     in Geometry.transform
         { transform: Transform.translate position
         , target: inner
         }
 
-renderPatternLayout :: Ask Context2D => NodeGraph.Pattern -> Number -> FlexLayout PatternAction
-renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
+renderPatternLayout :: Ask Context2D => RenderNestedPatternInput -> FlexLayout PatternAction
+renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeId } = Flex.createFlexLayout
     { flexAxis: Y
     , stretchChildren: true
     , wrap: \child -> Geometry.aabbPadding
@@ -65,7 +85,7 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
                 { fill: patternBackground 
                 , stroke: patternStrokeColor
                 , weight: 3.0
-                , onClick: const SelectNode
+                , onClick: const $ SelectNode $ pure nodeId
                 }
             }
     , children: 
@@ -87,16 +107,21 @@ renderPatternLayout { name, arguments } offset = Flex.createFlexLayout
     }
 
     where
-    argumentGeometries = arguments <#> case _ of
-        Pin id -> Flex.IsLayout $ Flex.createFlexLayout
+    argumentGeometries = arguments <#> (identity &&& lookupPattern) <#> uncurry case _, _ of
+        _, Nothing -> Flex.NotLayout $ Geometry.None zero
+        nodeId, Just (NodeGraph.Unify id) -> Flex.IsLayout $ Flex.createFlexLayout
             { flexAxis: X
             , arrangeChildren: Flex.SpaceBetween
             , children: [ Flex.NotLayout $ pin id LeftPin $ -offset, Flex.NotLayout $ pin id RightPin 0.0 ]
             }  
-        NestedPattern pattern -> Flex.IsLayout
-            $ Flex.wrapLayout (withSpacing >>> Geometry.mapAction (NestedPatternAction pattern.id))
-            $ renderPatternLayout pattern
-            $ offset + patternPadding
+        childId, Just (NodeGraph.PatternNode pattern) -> Flex.IsLayout
+            $ Flex.wrapLayout (withSpacing >>> Geometry.mapAction (patternActionWithParent nodeId))
+            $ renderPatternLayout
+                { lookupPattern
+                , pattern
+                , nodeId: childId
+                , offset: offset + patternPadding
+                }
 
 withSpacing :: forall a. Ask Context2D => Geometry a -> Geometry a
 withSpacing target = Geometry.aabbPadding
@@ -110,7 +135,7 @@ pin id side extraOffset = Geometry.transform
         { radius: pinRadius
         , position: zero
         , fill: pinColor 
-        , onClick: const $ ClickedPin id
+        -- , onClick: const $ ClickedPin id
         }
     , transform: Transform.translate (vec2 offset 0.0)
     , transformBounds: false
