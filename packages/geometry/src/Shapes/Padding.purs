@@ -25,11 +25,11 @@ type Padding = Vec D4 Number
 data PaddingPlacement = FixedChild | FixedCorner
 
 type PaddingAttributes :: Attributes
-type PaddingAttributes a r = 
-    ( target :: Geometry a
+type PaddingAttributes id action r = 
+    ( target :: Geometry id action
     , amount :: Padding
     , paddingPlacement :: Opt PaddingPlacement
-    , paddingModifiers :: Opt (Record (GeometryAttributes a ()))
+    , paddingModifiers :: Opt (Record (GeometryAttributes id action ()))
     | r )
 
 ---------- Constructors
@@ -43,19 +43,19 @@ fourWayPadding :: Number -> Number -> Number -> Number -> Padding
 fourWayPadding a b c d = Vec.cons a $ Vec.cons b $ Vec.cons c $ Vec.cons d Vec.empty
 
 aabbPadding :: 
-    forall given action. 
+    forall given id action.
     Ask Context2D => 
-    Closed.Coerce given (Record (PaddingAttributes action ())) => 
+    Closed.Coerce given (Record (PaddingAttributes id action ())) => 
     given -> 
-    Geometry action
+    Geometry id action
 aabbPadding = Closed.coerce >>>  _aabbPadding
 
 ---------- Implementation
 _aabbPadding :: 
-    forall action. 
+    forall id action. 
     Ask Context2D =>
-    Record (PaddingAttributes action ()) -> 
-    Geometry action
+    Record (PaddingAttributes id action ()) -> 
+    Geometry id action
 _aabbPadding attributes =
     process $ group
         { children: 

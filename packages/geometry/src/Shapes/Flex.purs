@@ -4,7 +4,6 @@ module Geometry.Shapes.Flex
     , Alignment(..)
     , LayoutChild(..)
     , FlexInputAttributes
-    , PureFlexLayout
     , FlexLayout
     , withFixedSize
     , withMinimumSize
@@ -35,31 +34,29 @@ data Alignment
     | AlignMiddle
     | AlignEnd
 
-data LayoutChild a
-    = NotLayout (Geometry a)
-    | IsLayout (FlexLayout a)
+data LayoutChild id action
+    = NotLayout (Geometry id action)
+    | IsLayout (FlexLayout id action)
 
 type FlexInputAttributes :: (Type -> Type) -> Attributes
-type FlexInputAttributes f a r = 
-    ( children :: Array (LayoutChild a)
+type FlexInputAttributes f id action r = 
+    ( children :: Array (LayoutChild id action)
     , flexAxis :: Axis
     , stretchChildren :: f Boolean
     , enforceSize :: f Boolean
     , arrangeChildren :: f Arrangement
     , alignChildren :: f Alignment
-    , wrap :: f (Geometry a -> Geometry a)
+    , wrap :: f (Geometry id action -> Geometry id action)
     , position :: f Vec2
     | r )
 
-type PureFlexLayout a = 
-    { fixSize :: Vec2 -> Geometry a
+type FlexLayout id action = 
+    { fixSize :: Vec2 -> Geometry id action
     , minimumSize :: Vec2
     , position :: Vec2
     }
 
-type FlexLayout a = PureFlexLayout a
-
-withDefaults :: forall a. Record (FlexInputAttributes Opt a ()) -> Record (FlexInputAttributes Id a ())
+withDefaults :: forall id action. Record (FlexInputAttributes Opt id action ()) -> Record (FlexInputAttributes Id id action ())
 withDefaults attributes = 
     { stretchChildren: Opt.fromOpt true attributes.stretchChildren
     , arrangeChildren: Opt.fromOpt ArrangeStart attributes.arrangeChildren
@@ -71,13 +68,13 @@ withDefaults attributes =
     , flexAxis: attributes.flexAxis
     }
 
-withFixedSize :: forall a. FlexLayout a -> Vec2 -> Geometry a
+withFixedSize :: forall id action. FlexLayout id action -> Vec2 -> Geometry id action
 withFixedSize { fixSize } size = fixSize size 
 
-withMinimumSize :: forall a. FlexLayout a -> Geometry a
+withMinimumSize :: forall id action. FlexLayout id action -> Geometry id action
 withMinimumSize { fixSize, minimumSize } = fixSize minimumSize
 
-wrapLayout :: forall a. Ask Context2D => (Geometry a -> Geometry a) -> FlexLayout a -> FlexLayout a
+wrapLayout :: forall id action. Ask Context2D => (Geometry id action -> Geometry id action) -> FlexLayout id action -> FlexLayout id action
 wrapLayout wrapper { minimumSize, position, fixSize } = { position, minimumSize: wrappedMinimumSize, fixSize: \size -> fixSize (size - deltaSize) # wrapper }
     where
     deltaSize :: Vec2
@@ -90,11 +87,11 @@ wrapLayout wrapper { minimumSize, position, fixSize } = { position, minimumSize:
     wrapSize size = maybe zero _.size $ bounds $ wrapper $ rect { position: position, size }
 
 -- | Create a flex layout
-createFlexLayout :: forall given action. Ask Context2D => Closed.Coerce given (Record (FlexInputAttributes Opt action ())) => given -> FlexLayout action
+createFlexLayout :: forall given id action. Ask Context2D => Closed.Coerce given (Record (FlexInputAttributes Opt id action ())) => given -> FlexLayout id action
 createFlexLayout = Closed.coerce >>> withDefaults >>>_createLayout
 
 -- | Internal version of createLayout with fully saturated inputs
-_createLayout :: forall a. Ask Context2D => Record (FlexInputAttributes Id a ()) -> FlexLayout a
+_createLayout :: forall id action. Ask Context2D => Record (FlexInputAttributes Id id action ()) -> FlexLayout id action
 _createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretchChildren, position, wrap, enforceSize } = wrapLayout wrap
     { fixSize: \exact -> if Array.null children then None position else stackFixed exact
     , minimumSize
@@ -116,26 +113,26 @@ _createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretc
     secondarySize :: Number
     secondarySize = fromMaybe 0.0 $ maximum $ (indexByAxis (other axis) <<<_.size) <$> childrenSizes
 
-    stackFixed :: Vec2 -> Geometry a
+    stackFixed :: Vec2 -> Geometry id action
     stackFixed fixedSize = group
         { children: processShapes $ Array.scanl scanner (startingOffset /\ None zero) childrenWithFixedSizes <#> snd
         , label: "Flex container"
         }
         where
-        processShapes :: Array (Geometry a) -> Array (Geometry a)
+        processShapes :: Array (Geometry id action) -> Array (Geometry id action)
         processShapes shapes | enforceSize = Array.cons invisibleAABB shapes
                              | otherwise = shapes
 
-        invisibleAABB :: Geometry a
+        invisibleAABB :: Geometry id action
         invisibleAABB = Geometry.rect
             { position
             , size: fixedSize
             }
 
-        childrenWithSizes :: Array (LayoutChild a /\ AABB)
+        childrenWithSizes :: Array (LayoutChild id action /\ AABB)
         childrenWithSizes = Array.zip children childrenSizes
 
-        childrenWithFixedSizes :: Array (Geometry a /\ AABB)
+        childrenWithFixedSizes :: Array (Geometry id action /\ AABB)
         childrenWithFixedSizes = childrenWithSizes <#> uncurry case _, _ of
             NotLayout geometry, oldBounds -> geometry /\ oldBounds
             IsLayout { fixSize, minimumSize, position }, { size } -> do
@@ -163,7 +160,7 @@ _createLayout { flexAxis: axis, children, alignChildren, arrangeChildren, stretc
             SpaceBetween -> -emptyPrimarySpace / (childrenCount - 1.0)
             _ -> 0.0
 
-        scanner :: (Number /\ Geometry a) -> (Geometry a /\ AABB) -> (Number /\ Geometry a)
+        scanner :: (Number /\ Geometry id action) -> (Geometry id action /\ AABB) -> (Number /\ Geometry id action)
         scanner (offset /\ _) (geometry /\ fixedBounds) = newOffset /\ translate (screenOffset + position - fixedBounds.position) geometry
             where
             screenOffset :: Vec2

@@ -9,22 +9,22 @@ import Geometry.Transform (TransformMatrix)
 import Geometry.Vector (x, y)
 import Graphics.Canvas (Context2D, arc, beginPath, fill, fillRect, fillText, stroke, strokeRect, strokeText, withContext)
 
-endShape :: forall action r. Context2D -> Record (GeometryAttributes action r) -> Effect Unit
+endShape :: forall id action r. Context2D -> Record (GeometryAttributes id action r) -> Effect Unit
 endShape context attributes = do
     -- TODO: clipping
     unless (attributes.fill == opt "none" || isUndefined attributes.fill) $ fill context
     unless (attributes.stroke == opt "none" || isUndefined attributes.stroke) $ stroke context
 
 withAttributes :: 
-    forall action r.
+    forall id action r.
     Context2D ->
-    Record (GeometryAttributes action r) -> 
+    Record (GeometryAttributes id action r) -> 
     Effect ~> Effect
 withAttributes context attributes continue = withContext context do
     setAttributes context attributes
     continue
 
-render :: forall action. Context2D -> Geometry action -> Effect Unit
+render :: forall id action. Context2D -> Geometry id action -> Effect Unit
 render context = case _ of
     Rect attributes -> withAttributes context attributes do
         let canvasRect = toCanvasRect attributes
@@ -60,7 +60,7 @@ render context = case _ of
 ---------- Foreign imports
 foreign import transform :: Context2D -> TransformMatrix -> Effect Unit
 foreign import setAttributes :: 
-    forall action r. 
+    forall id action r. 
     Context2D -> 
-    Record (GeometryAttributes action r) -> 
+    Record (GeometryAttributes id action r) -> 
     Effect Unit

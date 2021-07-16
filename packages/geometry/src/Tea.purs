@@ -7,7 +7,6 @@ module Geometry.Tea
     , launchTea
     , stopPropagation
     , currentGeometry
-    , shouldRecompute
     , eventStream
     , createMouseEvent
     ) where
@@ -40,32 +39,30 @@ import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes (mousedown, mouseup, click) as EventType
 
 ---------- Types
-newtype EventCheckGenerator action = EventCheckGenerator (forall zoom. Geometry zoom -> EventChecker action)
-type EventChecker action = (forall zoom. ((zoom -> action) -> Geometry zoom -> Maybe action) /\ EventCheckGenerator action)
+newtype EventCheckGenerator id action = EventCheckGenerator (forall zoom. Geometry id zoom -> EventChecker id action)
+type EventChecker id action = (forall zoom. ((zoom -> action) -> Geometry id zoom -> Maybe action) /\ EventCheckGenerator id action)
 
-data TeaF action result
+data TeaF id action result
     = StopPropagation result
-    | ShouldRecompute result 
-    | CurrentGeometry (Geometry action -> result)
+    | CurrentGeometry (Geometry id action -> result)
 
 type TeaResult state =
     { state :: state
     , continuePropagation :: Boolean
-    , shouldRecompute :: Boolean
     }
 
-type TEA action r = ( tea :: TeaF action | r )
+type TEA id action r = ( tea :: TeaF id action | r )
 
 -- | Monad action handlers run inside
-type TeaM state action = Run (EFFECT + STATE state + TEA action ())
+type TeaM state id action = Run (EFFECT + STATE state + TEA id action ())
 
 type SetupArgs :: Type -> Type -> Type
 type SetupArgs s a = { propagateAction :: a -> Effect Unit }
 
-type Tea state action =
+type Tea state id action =
     { initialState :: state
-    , render :: Ask Context2D => ReadableRef state -> ReadableRef (Geometry action)
-    , handleAction :: action -> TeaM state action Unit
+    , render :: Ask Context2D => ReadableRef state -> ReadableRef (Geometry id action)
+    , handleAction :: action -> TeaM state id action Unit
     , setup :: SetupArgs state action -> Cancelable Unit
     }
 
@@ -76,14 +73,11 @@ data CanvasEvent
     | MouseMove CanvasMouseEvent
 
 ---------- Constructors
-currentGeometry :: forall action result. Run (TEA action result) (Geometry action)
+currentGeometry :: forall id action result. Run (TEA id action result) (Geometry id action)
 currentGeometry = Run.lift _tea $ CurrentGeometry identity
 
-stopPropagation :: forall action result. Run (TEA action result) Unit
+stopPropagation :: forall id action result. Run (TEA id action result) Unit
 stopPropagation = Run.lift _tea $ StopPropagation unit
-
-shouldRecompute :: forall action result. Run (TEA action result) Unit
-shouldRecompute = Run.lift _tea $ ShouldRecompute unit
 
 createMouseEvent :: MouseEvent -> CanvasMouseEvent
 createMouseEvent ev = 
@@ -97,34 +91,33 @@ createMouseEvent ev =
         (MouseEvent.clientY ev)
 
 ---------- Helpers
-runTea :: forall state action. state -> Geometry action -> TeaM state action Unit -> Effect (TeaResult state) 
+runTea :: forall state id action. state -> Geometry id action -> TeaM state id action Unit -> Effect (TeaResult state) 
 runTea state geometry = execState state >>> runTea >>> map asRecord >>> runBaseEffect
     where
     asRecord = uncurry $ flip $ Record.insert _state
-    runTea = runAccumPure (\current -> on _tea (handler current >>> Loop) Done) Tuple { shouldRecompute: false, continuePropagation: true }
+    runTea = runAccumPure (\current -> on _tea (handler current >>> Loop) Done) Tuple { continuePropagation: true }
 
-    handler :: _ -> TeaF action ~> Tuple _
+    handler :: _ -> TeaF id action ~> Tuple _
     handler old (StopPropagation next) = old { continuePropagation = false } /\ next
-    handler old (ShouldRecompute next) = old { shouldRecompute = true } /\ next
     handler propagation (CurrentGeometry continue) = propagation /\ continue geometry
 
 checkMouseEvents :: 
-    forall action. 
+    forall id action. 
     Ask Context2D => 
-    (forall rest zoom. Record (GeometryAttributes zoom rest) -> Opt (CanvasMouseEvent -> zoom)) -> 
+    (forall rest zoom. Record (GeometryAttributes id zoom rest) -> Opt (CanvasMouseEvent -> zoom)) -> 
     CanvasMouseEvent -> 
-    EventChecker action
+    EventChecker id action
 checkMouseEvents key event = result    
     where
-    result :: EventChecker action
+    result :: EventChecker id action
     result = check /\ EventCheckGenerator recurse
 
-    check :: forall zoom. (zoom -> action) -> Geometry zoom -> Maybe action
+    check :: forall zoom. (zoom -> action) -> Geometry id zoom -> Maybe action
     check unzoom geom = case Opt.toMaybe $ attributes geom Opt.undefined key of
         Just handler | pointInside event.localPosition geom -> Just $ unzoom $ handler event
         _ -> Nothing
 
-    recurse :: forall zoom. Geometry zoom -> EventChecker action
+    recurse :: forall zoom. Geometry id zoom -> EventChecker id action
     recurse geometry = do
         let newEvent = event { localPosition = toLocalCoordinates geometry event.localPosition }
         checkMouseEvents key newEvent
@@ -137,12 +130,12 @@ handleActions propagateAction zipper = do
         for_ (Zipperrry.goNext zipper) $ handleActions propagateAction
 
 ---------- Implementations
-launchTea :: forall state action. Ask Context2D => Tea state action -> Cancelable Unit
+launchTea :: forall state id action. Ask Context2D => Tea state id action -> Cancelable Unit
 launchTea tea = do
     dirty <- liftEffect $ Ref.new true
     state <- liftEffect $ RR.writeable tea.initialState
     let 
-        renderStream :: ReadableRef (Geometry action)
+        renderStream :: ReadableRef (Geometry id action)
         renderStream = tea.render (RR.readonly state)
 
     let propagateAction action = do 
@@ -184,7 +177,7 @@ launchTea tea = do
     raf = animationFrame
 
 
-dispatchEvent :: forall action zoomed. (zoomed -> action) -> EventChecker action -> Geometry zoomed -> Array action
+dispatchEvent :: forall id action zoomed. (zoomed -> action) -> EventChecker id action -> Geometry id zoomed -> Array action
 dispatchEvent unzoom (check /\ EventCheckGenerator recurse) geometry = [Array.last nested, current <#> pure] >>= (fromMaybe [])
     where
     current = check unzoom geometry
@@ -205,4 +198,4 @@ _tea :: Proxy "tea"
 _tea = Proxy
 
 ---------- Typeclass instances
-derive instance Functor (TeaF action)
+derive instance Functor (TeaF id action)
