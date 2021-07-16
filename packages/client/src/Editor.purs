@@ -26,8 +26,8 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorState, PatternAction(..), Selection(..), _mousePosition, _rule, _selection, _visualRule)
-import Prelude (when)
+import Lunarlog.Editor.Types (EditorAction(..), EditorState, PatternAction(..), Selection(..), _mousePosition, _rule, _selection, _visualRule, freshNode, freshPin)
+import Prelude (when, zero)
 import Run.State (get, modify)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
@@ -79,7 +79,9 @@ scene visualRule =
         , rule: aged rule
         , selection: NoSelection
         , mouseMove: empty
-        , mousePosition: zero }
+        , mousePosition: zero
+        , nextId: zero
+        }
     , render
     , handleAction
     , setup
@@ -97,8 +99,8 @@ scene visualRule =
             case NonEmptyArray.index path 1 of
                 Nothing -> pure unit
                 Just parent -> do
-                    let newPin = NodeGraph.PinId 10
-                    let newPinNode = NodeGraph.NodeId 20
+                    newPin <- freshPin
+                    newPinNode <- freshNode
                     traceM { parent, nodeId, path, newPin, newPinNode }
                     modify $ set ( _rule <<< NodeGraph._ruleNodes <<< _atHashMap newPinNode) $ Just $ NodeGraph.Unify newPin
                     modify $ over 

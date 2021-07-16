@@ -59,7 +59,7 @@ type RenderNestedPatternInput =
     }
 
 ---------- Implementation
-renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry PatternAction)
+renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry Unit PatternAction)
 renderPattern { lookupPattern, pattern, visualPattern, nodeId } = ado
     let 
       inner = spy "inner" $ Flex.withMinimumSize $ renderPatternLayout 
@@ -74,7 +74,7 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId } = ado
         , target: inner
         }
 
-renderPatternLayout :: Ask Context2D => RenderNestedPatternInput -> FlexLayout PatternAction
+renderPatternLayout :: Ask Context2D => RenderNestedPatternInput -> FlexLayout Unit PatternAction
 renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeId } = Flex.createFlexLayout
     { flexAxis: Y
     , stretchChildren: true
@@ -123,13 +123,13 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
                 , offset: offset + patternPadding
                 }
 
-withSpacing :: forall a. Ask Context2D => Geometry a -> Geometry a
+withSpacing :: forall id a. Ask Context2D => Geometry id a -> Geometry id a
 withSpacing target = Geometry.aabbPadding
     { target
     , amount: Geometry.fourWayPadding 0.0 itemSpacing 0.0 0.0
     }
 
-pin :: Ask Context2D => PinId -> PinSide -> Number -> Geometry PatternAction
+pin :: forall id. Ask Context2D => PinId -> PinSide -> Number -> Geometry id PatternAction
 pin id side extraOffset = Geometry.transform
     { target: withSpacing $ Geometry.circle
         { radius: pinRadius
