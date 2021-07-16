@@ -54,10 +54,16 @@ module Loglude
     , module Loglude.Data.Exists
     , module Data.Profunctor.Strong
     , module Data.Hashable
+    , module Loglude.Run.State
+    , module Loglude.Data.Number
+    , module Control.Plus
     , module Data.Tuple.Nested ) where
 
 import Prelude
 
+import Loglude.Data.Number (succ)
+import Loglude.Run.State (assign, modifying, use)
+import Control.Plus ((<|>), class Alt, class Plus, alt, empty)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Either (Either(..), either, isLeft, isRight, note)
 import Data.Exists (Exists, mkExists, runExists)
