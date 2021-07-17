@@ -12,6 +12,7 @@ module Loglude.ReactiveRef
     , mapChanges
     , mapUsingStream
     , dropDuplicates
+    , pushAndWait
     ) where
 
 import Prelude
@@ -23,9 +24,12 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Effect (Effect)
+import Effect.Aff (Aff)
+import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Stream as Stream
+import Loglude.Cancelable as Cancelable
 import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -77,6 +81,12 @@ mapUsingStream mapRead mapChanges (ReactiveRef { read, changes }) = ReactiveRef
 -- | Reactive ref analogue of Aged.dropDuplicates
 dropDuplicates :: forall a. ReadableRef (Aged.Aged a) -> ReadableRef a
 dropDuplicates = mapUsingStream Aged.get Aged.dropDuplicates
+
+-- | Write a value inside a ref and wait until the change has been propagated
+pushAndWait :: forall a. a -> WriteableRef a -> Aff Unit
+pushAndWait updated ref = do
+    liftEffect $ write updated ref
+    void $ Cancelable.pull $ changes ref
 
 ---------- Typeclass instances
 coerceRef :: forall r. TypeEquals r () => ReactiveRef () ~> ReactiveRef r
