@@ -14,7 +14,7 @@ import Loglude.ReactiveRef as RR
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (PatternAction(..), patternActionWithParent)
+import Lunarlog.Editor.Types (EditorGeometryId(..), PatternAction(..), patternActionWithParent)
 
 ---------- Constants
 patternBackground :: String
@@ -59,7 +59,7 @@ type RenderNestedPatternInput =
     }
 
 ---------- Implementation
-renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry Unit PatternAction)
+renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry EditorGeometryId PatternAction)
 renderPattern { lookupPattern, pattern, visualPattern, nodeId } = ado
     let 
       inner = spy "inner" $ Flex.withMinimumSize $ renderPatternLayout 
@@ -74,20 +74,26 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId } = ado
         , target: inner
         }
 
-renderPatternLayout :: Ask Context2D => RenderNestedPatternInput -> FlexLayout Unit PatternAction
+renderPatternLayout :: Ask Context2D => RenderNestedPatternInput -> FlexLayout EditorGeometryId PatternAction
 renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeId } = Flex.createFlexLayout
     { flexAxis: Y
     , stretchChildren: true
-    , wrap: \child -> Geometry.aabbPadding
+    , wrap: \child -> Geometry.reporter
+        { id: NodeGeometry nodeId
+        , reportAbsoluteBounds: true
+        , target: Geometry.aabbPadding
             { target: child
             , amount: Geometry.fourWayPadding patternPadding itemSpacing 0.0 itemSpacing
             , paddingModifiers:
                 { fill: patternBackground 
                 , stroke: patternStrokeColor
                 , weight: 3.0
-                , onClick: const $ SelectNode $ pure nodeId
+                }
+            , parentModifiers:
+                { onClick: \e -> SelectNode e $ pure nodeId
                 }
             }
+        }
     , children: 
         [ Flex.IsLayout $ Flex.createFlexLayout
             { flexAxis: X
