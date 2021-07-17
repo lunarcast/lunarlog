@@ -29,7 +29,10 @@ type PaddingAttributes id action r =
     ( target :: Geometry id action
     , amount :: Padding
     , paddingPlacement :: Opt PaddingPlacement
+    -- | Attributes applied to the rect acting as the padding
     , paddingModifiers :: Opt (Record (GeometryAttributes id action ()))
+    -- | Attributes applied to the group containing the padding and the target
+    , parentModifiers :: Opt (Record (GeometryAttributes id action ()))
     | r )
 
 ---------- Constructors
@@ -57,10 +60,10 @@ _aabbPadding ::
     Record (PaddingAttributes id action ()) -> 
     Geometry id action
 _aabbPadding attributes =
-    process $ group
+    process $ group $ Record.merge parentModifiers 
         { children: 
             [ case bounds attributes.target of
-                Just { position, size } -> rect $ Record.merge (Opt.fromOpt (Closed.coerce {}) attributes.paddingModifiers)
+                Just { position, size } -> rect $ Record.merge paddingModifiers 
                     { position: position - amountTopLeft
                     , size: size + amountTopLeft + amountBottomRight
                     , label: "Padding"
@@ -78,3 +81,6 @@ _aabbPadding attributes =
 
     amountTopLeft = Vec.take d2 attributes.amount
     amountBottomRight = Vec.drop d2 attributes.amount
+
+    parentModifiers = Opt.fromOpt (Closed.coerce {}) attributes.parentModifiers
+    paddingModifiers = Opt.fromOpt (Closed.coerce {}) attributes.paddingModifiers

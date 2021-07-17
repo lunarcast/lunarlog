@@ -2,36 +2,45 @@ module Geometry.Tea
     ( SetupArgs
     , Tea
     , TeaM
-    , TEA
-    , TeaF
+    , RENDER
+    , PROPAGATION
+    , RenderF
+    , PropagationF
     , launchTea
     , stopPropagation
     , currentGeometry
     , eventStream
     , createMouseEvent
+    , absoluteBounds
+    , relativeBounds
+    , awaitRerender
     ) where
 
 import Loglude
 
 import Data.Array as Array
+import Data.HashMap as HashMap
 import Data.MouseButton (MouseButtons(..))
 import Data.Undefined.NoProblem as Opt
 import Data.ZipperArray as ZipperArray
 import Data.ZipperArray as Zipperrry
-import Debug (traceM)
+import Effect.Aff (launchAff_)
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
+import Geoemtry.Data.AABB (AABB)
 import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, attributes, children, pointInside, toLocalCoordinates)
-import Geometry.Render.Canvas (render)
+import Geometry.Render.Canvas (ReporterOutput, emptyReporterOutput, render)
 import Graphics.Canvas (Context2D, clearRect)
 import Loglude.Cancelable (Cancelable)
 import Loglude.Cancelable as Cancelable
+import Loglude.ReactiveRef (pushAndWait)
 import Loglude.ReactiveRef as RR
+import Prelude (Unit, identity, void)
 import Record as Record
-import Run (Step(..), on, runAccumPure, runBaseEffect)
+import Run (Step(..), interpret, liftAff, on, runAccumPure, runBaseAff', send)
 import Run as Run
-import Run.State (_state, execState)
+import Run.State (_state, execState, get)
 import Web.Event.Event (EventType)
 import Web.Event.Internal.Types (Event)
 import Web.HTML.HTMLElement as HtmlElement
@@ -42,22 +51,28 @@ import Web.UIEvent.MouseEvent.EventTypes (mousedown, mouseup, click) as EventTyp
 newtype EventCheckGenerator id action = EventCheckGenerator (forall zoom. Geometry id zoom -> EventChecker id action)
 type EventChecker id action = (forall zoom. ((zoom -> action) -> Geometry id zoom -> Maybe action) /\ EventCheckGenerator id action)
 
-data TeaF id action result
+data PropagationF result
     = StopPropagation result
+
+data RenderF id action result
+    = AwaitRerender result
     | CurrentGeometry (Geometry id action -> result)
+    | AbsoluteBounds id (Maybe AABB -> result)
+    | RelativeBounds id (Maybe AABB -> result)
 
 type TeaResult state =
     { state :: state
     , continuePropagation :: Boolean
     }
 
-type TEA id action r = ( tea :: TeaF id action | r )
+type PROPAGATION r = ( propagation :: PropagationF | r )
+type RENDER id action r = ( render :: RenderF id action | r )
 
 -- | Monad action handlers run inside
-type TeaM state id action = Run (EFFECT + STATE state + TEA id action ())
+type TeaM state id action = Run (AFF + EFFECT + STATE state + PROPAGATION + RENDER id action ())
 
 type SetupArgs :: Type -> Type -> Type
-type SetupArgs s a = { propagateAction :: a -> Effect Unit }
+type SetupArgs s a = { propagateAction :: a -> Aff Unit }
 
 type Tea state id action =
     { initialState :: state
@@ -73,11 +88,20 @@ data CanvasEvent
     | MouseMove CanvasMouseEvent
 
 ---------- Constructors
-currentGeometry :: forall id action result. Run (TEA id action result) (Geometry id action)
-currentGeometry = Run.lift _tea $ CurrentGeometry identity
+stopPropagation :: forall rest. Run (PROPAGATION rest) Unit
+stopPropagation = Run.lift _propagation $ StopPropagation unit
 
-stopPropagation :: forall id action result. Run (TEA id action result) Unit
-stopPropagation = Run.lift _tea $ StopPropagation unit
+currentGeometry :: forall id action rest. Run (RENDER id action rest) (Geometry id action)
+currentGeometry = Run.lift _render $ CurrentGeometry identity
+
+absoluteBounds :: forall id action rest. id -> Run (RENDER id action rest) (Maybe AABB)
+absoluteBounds id = Run.lift _render $ AbsoluteBounds id identity
+
+relativeBounds :: forall id action rest. id -> Run (RENDER id action rest) (Maybe AABB)
+relativeBounds id = Run.lift _render $ RelativeBounds id identity
+
+awaitRerender :: forall id action rest. Run (RENDER id action rest) Unit
+awaitRerender = Run.lift _render $ AwaitRerender unit
 
 createMouseEvent :: MouseEvent -> CanvasMouseEvent
 createMouseEvent ev = 
@@ -91,15 +115,35 @@ createMouseEvent ev =
         (MouseEvent.clientY ev)
 
 ---------- Helpers
-runTea :: forall state id action. state -> Geometry id action -> TeaM state id action Unit -> Effect (TeaResult state) 
-runTea state geometry = execState state >>> runTea >>> map asRecord >>> runBaseEffect
+runTea :: 
+    forall state id action. 
+    Hashable id => 
+    WriteableRef state -> 
+    Stream.Discrete Unit -> 
+    Ref (ReporterOutput id) -> 
+    state -> 
+    Geometry id action -> 
+    TeaM state id action Unit -> 
+    Aff (TeaResult state) 
+runTea pushState rerenders reports initialState geometry = runRender >>> execState initialState >>> runPropagation >>> map asRecord >>> runBaseAff'
     where
     asRecord = uncurry $ flip $ Record.insert _state
-    runTea = runAccumPure (\current -> on _tea (handler current >>> Loop) Done) Tuple { continuePropagation: true }
 
-    handler :: _ -> TeaF id action ~> Tuple _
-    handler old (StopPropagation next) = old { continuePropagation = false } /\ next
-    handler propagation (CurrentGeometry continue) = propagation /\ continue geometry
+    runRender = interpret (on _render handleRender send)
+
+    runPropagation = runAccumPure (\current -> on _propagation (handlePropagation current >>> Loop) Done) Tuple { continuePropagation: true }
+
+    handlePropagation :: _ -> PropagationF ~> Tuple _
+    handlePropagation old (StopPropagation next) = old { continuePropagation = false } /\ next
+
+    handleRender :: forall r. RenderF id action ~> Run (AFF + EFFECT + STATE state r)
+    handleRender (CurrentGeometry continue) = pure $ continue geometry
+    handleRender (AbsoluteBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.absoluteBounds)
+    handleRender (RelativeBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.relativeBounds)
+    handleRender (AwaitRerender next) = ado
+        get >>= flip pushAndWait pushState >>> liftAff
+        liftAff $ Cancelable.pull rerenders
+        in next
 
 checkMouseEvents :: 
     forall id action. 
@@ -122,7 +166,6 @@ checkMouseEvents key event = result
         let newEvent = event { localPosition = toLocalCoordinates geometry event.localPosition }
         checkMouseEvents key newEvent
 
-
 handleActions :: forall action. (action -> Effect Boolean) -> ZipperArray action -> Effect Unit
 handleActions propagateAction zipper = do
     continuePropagation <- propagateAction (ZipperArray.current zipper)
@@ -130,32 +173,45 @@ handleActions propagateAction zipper = do
         for_ (Zipperrry.goNext zipper) $ handleActions propagateAction
 
 ---------- Implementations
-launchTea :: forall state id action. Ask Context2D => Tea state id action -> Cancelable Unit
+launchTea :: forall state id action. Hashable id => Ask Context2D => Tea state id action -> Cancelable Unit
 launchTea tea = do
     dirty <- liftEffect $ Ref.new true
+    indexedReport <- liftEffect $ Ref.new emptyReporterOutput
     state <- liftEffect $ RR.writeable tea.initialState
+    rerenders <- liftEffect $ Stream.create
+
     let 
         renderStream :: ReadableRef (Geometry id action)
         renderStream = tea.render (RR.readonly state)
 
     let propagateAction action = do 
-          currentState <- RR.read state
-          currentGeometry <- RR.read renderStream
-          result <- runTea currentState currentGeometry $ tea.handleAction action
-          RR.write result.state state
+          currentState <- liftEffect $ RR.read state
+          currentGeometry <- liftEffect $ RR.read renderStream
+          result <- runTea state rerenders.event indexedReport currentState currentGeometry $ tea.handleAction action
+          liftEffect $ RR.write result.state state
           pure result.continuePropagation
 
-    let propagateActions actions = for_ (ZipperArray.fromArray actions) $ handleActions propagateAction
+    let 
+      propagateActions :: Array action -> Effect Unit
+      propagateActions = ZipperArray.fromArray >>> maybe (pure unit) propagateActionsImpl >>> launchAff_
+
+      propagateActionsImpl :: ZipperArray action -> Aff Unit
+      propagateActionsImpl actions = do
+          let current = ZipperArray.current actions 
+          shouldContinue <- propagateAction current 
+          case ZipperArray.goNext actions of
+            Just continue | shouldContinue -> propagateActionsImpl continue
+            _ -> pure unit
 
     let loop = const do
           Ref.read dirty >>= flip when do
             clearRect ask { x: 0.0, y: 0.0, width: 1000.0, height: 1000.0 }
-            RR.read renderStream >>= render ask
+            RR.read renderStream >>= render ask >>= flip Ref.write indexedReport
             Ref.write false dirty
+            rerenders.push unit
 
     Cancelable.subscribe raf loop
     Cancelable.subscribe (RR.changes renderStream) \_ -> do
-        traceM "rerender"
         Ref.write true dirty
     Cancelable.subscribe mousedown \ev -> do
         currentGeometry <- RR.read renderStream
@@ -194,8 +250,12 @@ eventStream fromEvent eventType = Cancelable.createStream \emit -> do
         Cancelable.addEventListener eventType listener false (HtmlElement.toEventTarget body_)
 
 ---------- Proxies
-_tea :: Proxy "tea"
-_tea = Proxy
+_render :: Proxy "render"
+_render = Proxy
+
+_propagation :: Proxy "propagation"
+_propagation = Proxy
 
 ---------- Typeclass instances
-derive instance Functor (TeaF id action)
+derive instance Functor PropagationF
+derive instance Functor (RenderF id action)

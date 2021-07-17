@@ -43,6 +43,7 @@ data Geometry id action
     | Text (Record (TextAttributes id action + GeometryAttributes id action ()))
     | Transform (Record (TransformAttributes id action + GeometryAttributes id action ()))
     | MapAction (Exists (MapActionF id action))
+    | Reporter (Record (ReporterAttributes Id id action ()))
     | None Vec2
 
 data ClickCheck
@@ -95,6 +96,14 @@ type TransformAttributes id action r =
     , transformBounds :: Opt Boolean
     | r )
 
+type ReporterAttributes :: (Type -> Type) -> Attributes
+type ReporterAttributes f id action r =
+    ( id :: id
+    , target :: Geometry id action
+    , reportAbsoluteBounds :: f Boolean
+    , reportRelativeBounds :: f Boolean
+    | r )
+
 ---------- Constructor types
 type GeometryConstructor extra = 
     forall given action id.
@@ -124,6 +133,17 @@ text = Closed.coerce >>> Text
 mapAction :: forall id from to. (from -> to) -> Geometry id from -> Geometry id to
 mapAction map target = { target, map } # MapActionF # mkExists # MapAction
 
+reporter :: forall given action id. Closed.Coerce given (Record (ReporterAttributes Opt id action ())) => given -> Geometry id action
+reporter = Closed.coerce >>> withDefaults >>> Reporter
+    where
+    withDefaults :: Record (ReporterAttributes Opt id action ()) -> _
+    withDefaults incomplete =
+        { target: incomplete.target
+        , id: incomplete.id
+        , reportAbsoluteBounds: Opt.fromOpt false incomplete.reportAbsoluteBounds
+        , reportRelativeBounds: Opt.fromOpt false incomplete.reportRelativeBounds
+        }
+
 ---------- Helpers
 translate :: forall id action. Vec2 -> Geometry id action -> Geometry id action
 translate amount (Circle attributes) = 
@@ -134,6 +154,8 @@ translate amount (Text attributes) =
     Text $ over _position ((+) amount) attributes
 translate amount (Group attributes) =
     Group $ over (_children <<< traversed) (translate amount) attributes
+translate amount (Reporter attributes) =
+    Reporter $ over _target (translate amount) attributes
 translate amount (Transform attributes)
     | Opt.fromOpt true attributes.transformBounds = Transform $ over _transform (_ <> Transform.translate amount) attributes
     | otherwise = Transform $ over _target (translate amount) attributes
@@ -168,11 +190,13 @@ bounds (Text attributes) = Just do
     , size: vec2 metrics.width (metrics.fontBoundingBoxAscent)
     }
 bounds (MapAction inner) = inner # runExists (unwrap >>> _.target >>> bounds)
+bounds (Reporter { target }) = bounds target
 bounds (None position) = Just { position, size: zero }
 
 -- | Returns a polygon surrounding the shape
 points :: forall id action. Ask Context2D => Geometry id action -> Array Vec2
 points (Transform { transform, target }) = points target <#> multiplyVector transform
+points (Reporter { target }) = points target
 points a = bounds a # maybe [] AABB.points
 
 pointInside :: forall id action. Ask Context2D => Vec2 -> Geometry id action -> Boolean
@@ -192,6 +216,7 @@ toLocalCoordinates _ point = point
 -- | Get an array with all the children owned by a geometry
 children :: forall id action. Geometry id action -> forall result. (forall subaction. (subaction -> action) -> Geometry id subaction -> result) -> Array result
 children (Group { children }) f = f identity <$> children
+children (Reporter { target }) f = [f identity target]
 children (Transform { target }) f = [f identity target]
 children (MapAction existential) f = [existential # runExists \(MapActionF { target, map }) -> f map target]
 children _ _ = []
@@ -204,7 +229,7 @@ attributes (Group attributes) _ f = f attributes
 attributes (Text attributes) _ f = f attributes
 attributes (Transform attributes) _ f = f attributes
 attributes (None position) _ f = f $ (Closed.coerce {} :: Record (GeometryAttributes id action ()))
-attributes (MapAction _) default _ = default
+attributes _ default _ = default
 
 ---------- Lenses
 _position :: forall r. Lens' { position :: Vec2 | r } Vec2
