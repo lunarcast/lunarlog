@@ -11,8 +11,9 @@ import Data.Lens (traversed)
 import Data.MouseButton (nothingPressed)
 import Data.Traversable (sequence)
 import Data.Vec as Vec
-import Debug (spy)
+import Debug (spy, traceM)
 import Effect.Aff (launchAff_)
+import Effect.Class.Console (logShow)
 import Geometry (Geometry(..), Tea)
 import Geometry as Geometry
 import Geometry.Base (mapAction)
@@ -22,13 +23,12 @@ import Loglude.Cancelable as Cancelable
 import Loglude.Data.Lens (_atHashMap)
 import Loglude.ReactiveRef (writeable)
 import Loglude.ReactiveRef as RR
+import Loglude.Run.ExternalState (assign, get, gets, modifying, use)
 import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
 import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), Selection(..), _atRuleNode, _atVisualRuleNode, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRule, freshNode, freshPin)
-import Prelude (when, zero)
-import Run.State (get, modify)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -95,7 +95,7 @@ scene visualRule =
     handleAction = case _ of
         NodeAction (SelectNode event path) -> do
             let nodeId = NonEmptyArray.head path
-            modify $ set _selection $ SelectedNode nodeId
+            assign _selection $ SelectedNode nodeId
             case NonEmptyArray.index path 1 of
                 Nothing -> pure unit
                 Just parent -> do
@@ -105,28 +105,33 @@ scene visualRule =
                         position <- liftEffect $ RR.writeable $ Aged.aged bounds.position
 
                         -- Create replacement pin
-                        modify $ set (_atRuleNode newPinNode) $ Just $ NodeGraph.Unify newPin
+                        assign (_atRuleNode newPinNode) $ Just $ NodeGraph.Unify newPin
 
                         -- Create visual node for grabbed pattern
-                        modify $ set (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position }
+                        assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position }
 
                         -- Mark the grabbed pattern as top-level
-                        modify $ over _ruleBody $ flip Array.snoc nodeId
+                        modifying _ruleBody $ flip Array.snoc nodeId
 
                         -- Remove the grabbed pattern from the argument list of the parent
-                        modify $ over (_ruleNode parent <<< NodeGraph._patternNode <<< NodeGraph._patternArguments <<< traversed) 
+                        modifying (_ruleNode parent <<< NodeGraph._patternNode <<< NodeGraph._patternArguments <<< traversed) 
                             \id -> if id == nodeId then newPinNode else id
+
+                        gets _.mousePosition >>= logShow
 
                         -- Trigger rerender for the grabbed pattern to resize
                         awaitRerender
 
+                        gets _.mousePosition >>= logShow
+
                         -- Move the resized pattern to look "good" relative to the mouse
                         absoluteBounds (NodeGeometry nodeId) >>= traverse_ \bounds' -> do
-                            let relativeMousePosition = event.worldPosition - bounds'.position
+                            mousePosition <- use _mousePosition
+                            let relativeMousePosition = mousePosition - bounds.position
 
                             -- size' * mouse / size
                             let fixedRelativeMousePosition = Vec.zipWith (/) (Vec.zipWith (*) bounds'.size relativeMousePosition) bounds.size
-                            let newPosition = event.worldPosition - fixedRelativeMousePosition
+                            let newPosition = mousePosition - fixedRelativeMousePosition
 
                             liftEffect $ RR.write (Aged.aged newPosition) position
 
@@ -134,12 +139,13 @@ scene visualRule =
             stopPropagation
         RefreshSelection event -> do
             when (nothingPressed event.buttons) do
-                modify $ set _selection NoSelection
+                assign _selection NoSelection
         MouseUp event -> do
             handleAction $ RefreshSelection event
         MouseMove event -> do
             oldPosition <- get <#> view _mousePosition
-            modify $ set _mousePosition $ event.worldPosition
+            traceM "here"
+            assign _mousePosition $ event.worldPosition
 
             handleAction $ RefreshSelection event
 

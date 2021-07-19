@@ -7,6 +7,7 @@ import Data.Aged as Aged
 import Data.Array.NonEmpty as NonEmptyArray
 import FRP.Stream as Stream
 import Geometry (Vec2, CanvasMouseEvent)
+import Loglude.Run.ExternalState (EXTERNAL_STATE, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId)
 import Lunarlog.Core.NodeGraph as NodeGraph
@@ -42,13 +43,13 @@ type EditorState =
 patternActionWithParent :: NodeId -> PatternAction -> PatternAction
 patternActionWithParent parent (SelectNode event path) = SelectNode event (path `NonEmptyArray.snoc` parent)
 
-fresh :: forall r. Run (STATE EditorState r) Natural
+fresh :: forall r. Run (EXTERNAL_STATE EditorState r) Natural
 fresh = use _nextId <* modifying _nextId succ 
 
-freshPin :: forall r. Run (STATE EditorState r) NodeGraph.PinId
+freshPin :: forall r. Run (EXTERNAL_STATE EditorState r) NodeGraph.PinId
 freshPin = fresh <#> natToInt <#> NodeGraph.PinId
 
-freshNode :: forall r. Run (STATE EditorState r) NodeGraph.NodeId
+freshNode :: forall r. Run (EXTERNAL_STATE EditorState r) NodeGraph.NodeId
 freshNode = fresh <#> natToInt <#> NodeGraph.NodeId
 
 ---------- Lenses
