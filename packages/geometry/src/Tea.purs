@@ -31,16 +31,16 @@ import FRP.Stream as Stream
 import Geoemtry.Data.AABB (AABB)
 import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, attributes, children, pointInside, toLocalCoordinates)
 import Geometry.Render.Canvas (ReporterOutput, emptyReporterOutput, render)
-import Graphics.Canvas (Context2D, clearRect)
+import Geometry.Vector (Vec2, x, y)
+import Graphics.Canvas (CanvasElement, Context2D, clearRect, setCanvasHeight, setCanvasWidth)
 import Loglude.Cancelable (Cancelable)
 import Loglude.Cancelable as Cancelable
 import Loglude.ReactiveRef (pushAndWait)
 import Loglude.ReactiveRef as RR
+import Loglude.Run.ExternalState (EXTERNAL_STATE, get, runStateUsingReactiveRef)
 import Prelude (Unit, identity, void)
-import Record as Record
 import Run (Step(..), interpret, liftAff, on, runAccumPure, runBaseAff', send)
 import Run as Run
-import Run.State (_state, execState, get)
 import Web.Event.Event (EventType)
 import Web.Event.Internal.Types (Event)
 import Web.HTML.HTMLElement as HtmlElement
@@ -60,16 +60,16 @@ data RenderF id action result
     | AbsoluteBounds id (Maybe AABB -> result)
     | RelativeBounds id (Maybe AABB -> result)
 
+type TeaResult :: forall k. k -> Type
 type TeaResult state =
-    { state :: state
-    , continuePropagation :: Boolean
+    { continuePropagation :: Boolean
     }
 
 type PROPAGATION r = ( propagation :: PropagationF | r )
 type RENDER id action r = ( render :: RenderF id action | r )
 
 -- | Monad action handlers run inside
-type TeaM state id action = Run (AFF + EFFECT + STATE state + PROPAGATION + RENDER id action ())
+type TeaM state id action = Run (AFF + EFFECT + EXTERNAL_STATE state + PROPAGATION + RENDER id action ())
 
 type SetupArgs :: Type -> Type -> Type
 type SetupArgs s a = { propagateAction :: a -> Aff Unit }
@@ -119,30 +119,26 @@ runTea ::
     forall state id action. 
     Hashable id => 
     WriteableRef state -> 
-    Stream.Discrete Unit -> 
+    Stream.Notifier -> 
     Ref (ReporterOutput id) -> 
-    state -> 
     Geometry id action -> 
     TeaM state id action Unit -> 
-    Aff (TeaResult state) 
-runTea pushState rerenders reports initialState geometry = runRender >>> execState initialState >>> runPropagation >>> map asRecord >>> runBaseAff'
+    Aff (TeaResult state)
+runTea pushState rerenders reports geometry = runRender >>> runStateUsingReactiveRef pushState >>> runPropagation >>> map fst >>> runBaseAff'
     where
-    asRecord = uncurry $ flip $ Record.insert _state
-
     runRender = interpret (on _render handleRender send)
-
     runPropagation = runAccumPure (\current -> on _propagation (handlePropagation current >>> Loop) Done) Tuple { continuePropagation: true }
 
     handlePropagation :: _ -> PropagationF ~> Tuple _
     handlePropagation old (StopPropagation next) = old { continuePropagation = false } /\ next
 
-    handleRender :: forall r. RenderF id action ~> Run (AFF + EFFECT + STATE state r)
+    handleRender :: forall r. RenderF id action ~> Run (AFF + EXTERNAL_STATE state + EFFECT r)
     handleRender (CurrentGeometry continue) = pure $ continue geometry
     handleRender (AbsoluteBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.absoluteBounds)
     handleRender (RelativeBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.relativeBounds)
     handleRender (AwaitRerender next) = ado
-        get >>= flip pushAndWait pushState >>> liftAff
-        liftAff $ Cancelable.pull rerenders
+        get >>= \s -> liftAff $ pushAndWait s pushState
+        liftAff $ Cancelable.pull rerenders.event
         in next
 
 checkMouseEvents :: 
@@ -178,17 +174,15 @@ launchTea tea = do
     dirty <- liftEffect $ Ref.new true
     indexedReport <- liftEffect $ Ref.new emptyReporterOutput
     state <- liftEffect $ RR.writeable tea.initialState
-    rerenders <- liftEffect $ Stream.create
+    rerenders <- liftEffect Stream.notifier
 
     let 
         renderStream :: ReadableRef (Geometry id action)
         renderStream = tea.render (RR.readonly state)
 
     let propagateAction action = do 
-          currentState <- liftEffect $ RR.read state
           currentGeometry <- liftEffect $ RR.read renderStream
-          result <- runTea state rerenders.event indexedReport currentState currentGeometry $ tea.handleAction action
-          liftEffect $ RR.write result.state state
+          result <- runTea state rerenders indexedReport currentGeometry $ tea.handleAction action
           pure result.continuePropagation
 
     let 
@@ -203,12 +197,19 @@ launchTea tea = do
             Just continue | shouldContinue -> propagateActionsImpl continue
             _ -> pure unit
 
+    let handleResize size = do
+          canvasElement <- contextToCanvas ask
+          setCanvasWidth canvasElement $ x size
+          setCanvasHeight canvasElement $ y size
+          Ref.write true dirty
+
     let loop = const do
           Ref.read dirty >>= flip when do
-            clearRect ask { x: 0.0, y: 0.0, width: 1000.0, height: 1000.0 }
+            size <- RR.read windowSize
+            clearRect ask { x: 0.0, y: 0.0, width: x size, height: y size }
             RR.read renderStream >>= render ask >>= flip Ref.write indexedReport
             Ref.write false dirty
-            rerenders.push unit
+            Stream.notify rerenders
 
     Cancelable.subscribe raf loop
     Cancelable.subscribe (RR.changes renderStream) \_ -> do
@@ -223,6 +224,9 @@ launchTea tea = do
         currentGeometry <- RR.read renderStream
         propagateActions $ dispatchEvent identity (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
 
+    Cancelable.subscribe (RR.changes windowSize) handleResize
+
+    liftEffect (RR.read windowSize >>= handleResize)
     tea.setup { propagateAction: propagateAction >>> void }
     where
     clicks = eventStream MouseEvent.fromEvent EventType.click
@@ -259,3 +263,7 @@ _propagation = Proxy
 ---------- Typeclass instances
 derive instance Functor PropagationF
 derive instance Functor (RenderF id action)
+
+---------- Foreign imports
+foreign import windowSize :: ReadableRef Vec2
+foreign import contextToCanvas :: Context2D -> Effect CanvasElement
