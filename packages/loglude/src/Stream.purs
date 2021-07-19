@@ -1,8 +1,9 @@
-module FRP.Stream (module FRP.Event, Discrete, bind, discard, effectfulMap, inspect) where
+module FRP.Stream (module FRP.Event, Discrete, Notifier, bind, discard, effectfulMap, inspect, notify, notifier) where
+
+import Prelude hiding (discard, bind)
 
 import Effect (Effect)
 import FRP.Event (class Filterable, class IsEvent, Event, EventIO, count, create, filterMap, fix, fold, folded, gate, gateBy, keepLatest, makeEvent, mapAccum, sampleOn, sampleOn_, subscribe, withLast)
-import Prelude hiding (discard, bind)
 
 discard :: forall b. Discrete Unit -> (Unit -> Discrete b) -> Discrete b
 discard = bind
@@ -18,5 +19,15 @@ effectfulMap f a = makeEvent \emit -> Prelude.do
 inspect :: forall a. (a -> Effect Unit) -> Event a -> Event a
 inspect f = effectfulMap \v -> f v $> v
 
+-- | Trigger a notification
+notify :: Notifier -> Effect Unit
+notify e = e.push unit
+
+-- | Create a notifier
+notifier :: Effect Notifier
+notifier = create
+
 ---------- Types
 type Discrete = Event
+
+type Notifier = EventIO Unit

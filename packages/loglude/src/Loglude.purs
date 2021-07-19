@@ -7,7 +7,6 @@ module Loglude
     , module Loglude.Data.Exists
     , module Loglude.Data.Lens
     , module Loglude.Cancelable
-    , module Loglude.Run.State
     , module Loglude.Data.Number
     , module Data.Vec
     , module Data.Typelevel.Num
@@ -67,7 +66,6 @@ import Prelude
 import Data.Lens.Types (AffineTraversal', AffineTraversal)
 import Data.Natural (Natural, natToInt, intToNat)
 import Loglude.Data.Number (succ)
-import Loglude.Run.State (assign, modifying, use)
 import Control.Plus ((<|>), class Alt, class Plus, alt, empty)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Either (Either(..), either, isLeft, isRight, note)
