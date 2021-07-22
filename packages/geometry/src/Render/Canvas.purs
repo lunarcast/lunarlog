@@ -15,11 +15,13 @@ import Geometry.Base (Geometry(..), GeometryAttributes, MapActionF(..), bounds)
 import Geometry.Transform (TransformMatrix, multiplyVector)
 import Geometry.Vector (x, y)
 import Graphics.Canvas (Context2D, arc, beginPath, fill, fillRect, fillText, stroke, strokeRect, strokeText, withContext)
+import Loglude.Data.Tree as Tree
 
 ---------- Types
 type ReporterOutput id =
     { absoluteBounds :: HashMap id AABB
     , relativeBounds :: HashMap id AABB
+    , idTree :: Tree id
     }
 
 ---------- Constants
@@ -27,6 +29,7 @@ emptyReporterOutput :: forall id. ReporterOutput id
 emptyReporterOutput =
     { absoluteBounds: HashMap.empty
     , relativeBounds: HashMap.empty
+    , idTree: empty
     }
 
 ---------- Helpers
@@ -34,6 +37,7 @@ mergeReporterOutputs :: forall id. Hashable id => ReporterOutput id -> ReporterO
 mergeReporterOutputs a b =
     { absoluteBounds: a.absoluteBounds `HashMap.union` b.absoluteBounds
     , relativeBounds: a.relativeBounds `HashMap.union` b.relativeBounds
+    , idTree: a.idTree <|> b.idTree
     }
 
 ---------- Implementation
@@ -75,9 +79,8 @@ render context = case _ of
     Transform attributes -> withAttributes context attributes do
         transform context attributes.transform
         output <- render context attributes.target
-        pure
-            { absoluteBounds: output.absoluteBounds # HashMap.mapMaybe (AABB.points >>> map (multiplyVector attributes.transform) >>> AABB.fromPoints)
-            , relativeBounds: output.relativeBounds
+        pure $ output
+            { absoluteBounds = output.absoluteBounds # HashMap.mapMaybe (AABB.points >>> map (multiplyVector attributes.transform) >>> AABB.fromPoints)
             }
     Group attributes ->  withAttributes context attributes ado
         outputs <- for attributes.children $ render context
@@ -91,19 +94,23 @@ render context = case _ of
         unless (isUndefined attributes.stroke) $ renderText strokeText
         pure emptyReporterOutput
     MapAction existential -> existential # runExists \(MapActionF { target }) -> render context target
+    LockBounds { target } -> render context target
     Reporter { target, id, reportAbsoluteBounds, reportRelativeBounds } -> ado
         output <- render context target
+        let idTree = Tree.annotate id output.idTree
         in case provide context $ bounds target of
-            Nothing -> output
+            Nothing -> output { idTree = idTree }
             Just bounds ->
                 { absoluteBounds: 
                     output.absoluteBounds # applyWhen reportAbsoluteBounds (HashMap.insert id bounds)
                 , relativeBounds:
                     output.relativeBounds # applyWhen reportRelativeBounds (HashMap.insert id bounds)
+                , idTree
                 }
         where
         applyWhen condition f input | condition = f input
                                     | otherwise = input
+
     None _ -> pure emptyReporterOutput
 
 ---------- Foreign imports

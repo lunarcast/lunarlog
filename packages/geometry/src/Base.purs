@@ -4,10 +4,12 @@ module Geometry.Base where
 import Loglude
 
 import Data.Array as Array
+import Data.Lazy (Lazy)
+import Data.Lazy as Lazy
 import Data.Lens (traversed)
 import Data.MouseButton (MouseButtons)
 import Data.Undefined.NoProblem.Closed as Closed
-import Geoemtry.Data.AABB (AABB, AABBLike)
+import Geoemtry.Data.AABB (AABBLike, AABB)
 import Geoemtry.Data.AABB as AABB
 import Geometry.TextBaseline (TextBaseline)
 import Geometry.Transform (TransformMatrix, inverse, multiplyVector)
@@ -42,6 +44,7 @@ data Geometry id action
     | Group (Record (GroupAttributes id action + GeometryAttributes id action ()))
     | Text (Record (TextAttributes id action + GeometryAttributes id action ()))
     | Transform (Record (TransformAttributes id action + GeometryAttributes id action ()))
+    | LockBounds (Record (LockBoundsAttributes id action ()))
     | MapAction (Exists (MapActionF id action))
     | Reporter (Record (ReporterAttributes Id id action ()))
     | None Vec2
@@ -93,7 +96,12 @@ type TransformAttributes :: Attributes
 type TransformAttributes id action r =
     ( transform :: TransformMatrix
     , target :: Geometry id action
-    , transformBounds :: Opt Boolean
+    | r )
+
+type LockBoundsAttributes :: Attributes
+type LockBoundsAttributes id action r =
+    ( bounds :: Lazy (Maybe AABB)
+    , target :: Geometry id action
     | r )
 
 type ReporterAttributes :: (Type -> Type) -> Attributes
@@ -127,6 +135,9 @@ group = Closed.coerce >>> go
 transform :: GeometryConstructor TransformAttributes
 transform = Closed.coerce >>> Transform
 
+lockBounds :: forall id action. Ask Context2D => (Geometry id action -> Geometry id action) -> Geometry id action -> Geometry id action
+lockBounds f geometry = LockBounds { target: f geometry, bounds: Lazy.defer \_ -> bounds geometry }
+
 text :: GeometryConstructor TextAttributes
 text = Closed.coerce >>> Text
 
@@ -144,6 +155,9 @@ reporter = Closed.coerce >>> withDefaults >>> Reporter
         , reportRelativeBounds: Opt.fromOpt false incomplete.reportRelativeBounds
         }
 
+annotate :: forall id action. id -> Geometry id action -> Geometry id action
+annotate id target = reporter { id, target }
+
 ---------- Helpers
 translate :: forall id action. Vec2 -> Geometry id action -> Geometry id action
 translate amount (Circle attributes) = 
@@ -156,9 +170,12 @@ translate amount (Group attributes) =
     Group $ over (_children <<< traversed) (translate amount) attributes
 translate amount (Reporter attributes) =
     Reporter $ over _target (translate amount) attributes
-translate amount (Transform attributes)
-    | Opt.fromOpt true attributes.transformBounds = Transform $ over _transform (_ <> Transform.translate amount) attributes
-    | otherwise = Transform $ over _target (translate amount) attributes
+translate amount (Transform attributes) =
+    Transform $ over _transform (_ <> Transform.translate amount) attributes
+translate amount (LockBounds attributes) = LockBounds 
+    { target: translate amount attributes.target
+    , bounds: attributes.bounds <#> over (_Just <<< _position) ((+) amount)
+    } 
 translate amount (MapAction existential) = MapAction $ mapExists mapInner existential
     where
     mapInner :: MapActionF id action ~> MapActionF id action
@@ -179,11 +196,10 @@ bounds (Group { children }) = foldr merger Nothing $ bounds <$> children
     merger = case _, _ of
         Just a, Just b -> Just $ AABB.union a b
         a, b -> a <|> b
-bounds (Transform attributes)
-    | Opt.fromOpt true attributes.transformBounds = do
-        innerBounds <- bounds attributes.target
-        AABB.fromPoints $ points $ Transform attributes
-    | otherwise = bounds attributes.target
+bounds (LockBounds attributes) = Lazy.force attributes.bounds
+bounds (Transform attributes) = do
+    innerBounds <- bounds attributes.target
+    AABB.fromPoints $ points $ Transform attributes
 bounds (Text attributes) = Just do
     let metrics = measureText ask attributes.font attributes.text 
     { position: attributes.position
@@ -203,6 +219,7 @@ pointInside :: forall id action. Ask Context2D => Vec2 -> Geometry id action -> 
 pointInside point (Circle attributes) = 
     distanceSquared point attributes.position < attributes.radius `pow` 2.0
 pointInside point (Group { children }) = Array.any (pointInside point) children
+pointInside point (LockBounds { target }) = pointInside point target
 pointInside point shape@(Transform { target }) = pointInside projected target
     where
     projected = toLocalCoordinates shape point
@@ -218,6 +235,7 @@ children :: forall id action. Geometry id action -> forall result. (forall subac
 children (Group { children }) f = f identity <$> children
 children (Reporter { target }) f = [f identity target]
 children (Transform { target }) f = [f identity target]
+children (LockBounds { target }) f = [f identity target]
 children (MapAction existential) f = [existential # runExists \(MapActionF { target, map }) -> f map target]
 children _ _ = []
 
