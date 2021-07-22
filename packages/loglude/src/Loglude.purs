@@ -8,13 +8,15 @@ module Loglude
     , module Loglude.Data.Lens
     , module Loglude.Cancelable
     , module Loglude.Data.Number
+    , module Loglude.Data.Tree
+    , module Loglude.Data.Debug
+    , module Loglude.MutableRecord  
     , module Data.Vec
     , module Data.Typelevel.Num
     , module Data.Undefined.NoProblem
     , module Unsafe.Coerce
     , module Type.RowList
     , module Prim.RowList
-    , module Loglude.MutableRecord  
     , module Type.Proxy
     , module Prim.Row
     , module Web.UIEvent.MouseEvent
@@ -59,10 +61,14 @@ module Loglude
     , module Data.Hashable
     , module Control.Plus
     , module Data.Natural
+    , module Data.Debug
     , module Data.Tuple.Nested ) where
 
 import Prelude
 
+import Loglude.Data.Debug (debugSpy, logPretty, myDebug, showPretty)
+import Data.Debug (class Debug, debug, genericDebug)
+import Loglude.Data.Tree (Tree(..))
 import Data.Lens.Types (AffineTraversal', AffineTraversal)
 import Data.Natural (Natural, natToInt, intToNat)
 import Loglude.Data.Number (succ)

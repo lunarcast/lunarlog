@@ -51,6 +51,27 @@ let additions =
           , "web-uievents"
           ]
         }
+      , debugged =
+        { dependencies =
+          [ "prelude"
+          , "console"
+          , "ordered-collections"
+          , "either"
+          , "tuples"
+          , "lists"
+          , "strings"
+          , "arrays"
+          , "bifunctors"
+          , "record"
+          , "effect"
+          , "datetime"
+          , "enums"
+          , "unordered-collections"
+          , "fixed-points"
+          ]
+        , repo = "https://github.com/Mateiadrielrafael/purescript-debugged"
+        , version = "633220f91f87c9acbc4eebbf87628e6cdc658b7b"
+        }
       }
 
 let packages =

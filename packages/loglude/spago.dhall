@@ -1,5 +1,6 @@
 { name = "lunarlog-prelude"
-, dependencies = [ "console", "effect", "prelude", "psci-support", "event" ]
+, dependencies =
+  [ "console", "effect", "prelude", "psci-support", "debugged", "event" ]
 , packages = ../../packages.dhall
 , sources = [ "src/**/*.purs" ]
 }

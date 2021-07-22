@@ -44,3 +44,8 @@ else instance
     (TypeEquals {| target } {}) => 
     StreamsToAttribsRL RowList.Nil row target where
     makeAttribsRL _ {} = pure $ MutableRecord.fromRecord $ (from {})
+
+{-
+{ a :: Stream ..., b :: Stream ... }
+Stream { a :: ..., b :: ... }
+-}
