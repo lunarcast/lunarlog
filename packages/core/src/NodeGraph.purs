@@ -2,6 +2,8 @@ module Lunarlog.Core.NodeGraph where
 
 import Loglude
 
+import Data.Debug (class Debug)
+
 
 newtype NodeId = NodeId Int
 newtype PinId = PinId Int
@@ -63,6 +65,9 @@ _patternArguments = prop (Proxy :: _ "arguments")
 ---------- Typeclass instances
 derive newtype instance Show PinId
 derive newtype instance Show NodeId
+
+derive newtype instance Debug PinId
+derive newtype instance Debug NodeId
 
 derive instance Eq NodeId
 derive instance Eq PinId
