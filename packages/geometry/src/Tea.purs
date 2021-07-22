@@ -14,6 +14,7 @@ module Geometry.Tea
     , absoluteBounds
     , relativeBounds
     , awaitRerender
+    , currentReport
     ) where
 
 import Loglude
@@ -57,6 +58,7 @@ data PropagationF result
 data RenderF id action result
     = AwaitRerender result
     | CurrentGeometry (Geometry id action -> result)
+    | CurrentReport (ReporterOutput id -> result)
     | AbsoluteBounds id (Maybe AABB -> result)
     | RelativeBounds id (Maybe AABB -> result)
 
@@ -103,6 +105,9 @@ relativeBounds id = Run.lift _render $ RelativeBounds id identity
 awaitRerender :: forall id action rest. Run (RENDER id action rest) Unit
 awaitRerender = Run.lift _render $ AwaitRerender unit
 
+currentReport :: forall id action rest. Run (RENDER id action rest) (ReporterOutput id)
+currentReport = Run.lift _render $ CurrentReport identity
+
 createMouseEvent :: MouseEvent -> CanvasMouseEvent
 createMouseEvent ev = 
     { buttons: MouseButtons $ MouseEvent.buttons ev
@@ -136,6 +141,7 @@ runTea pushState rerenders reports geometry = runRender >>> runStateUsingReactiv
     handleRender (CurrentGeometry continue) = pure $ continue geometry
     handleRender (AbsoluteBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.absoluteBounds)
     handleRender (RelativeBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.relativeBounds)
+    handleRender (CurrentReport continue) = liftEffect (Ref.read reports) <#> continue 
     handleRender (AwaitRerender next) = ado
         get >>= \s -> liftAff $ pushAndWait s pushState
         liftAff $ Cancelable.pull rerenders.event
