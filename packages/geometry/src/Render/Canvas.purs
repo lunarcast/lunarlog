@@ -1,44 +1,18 @@
 module Geometry.Render.Canvas 
-    ( ReporterOutput
-    , render
-    , emptyReporterOutput
-    , mergeReporterOutputs
+    ( render
     ) where
 
 import Loglude
 
 import Data.HashMap as HashMap
 import Data.Undefined.NoProblem (isUndefined)
-import Geoemtry.Data.AABB (AABB, toCanvasRect)
+import Geoemtry.Data.AABB (toCanvasRect)
 import Geoemtry.Data.AABB as AABB
-import Geometry.Base (Geometry(..), GeometryAttributes, MapActionF(..), bounds)
+import Geometry.Base (Geometry(..), GeometryAttributes, MapActionF(..), ReporterOutput, bounds, emptyReporterOutput, mergeReporterOutputs)
 import Geometry.Transform (TransformMatrix, multiplyVector)
 import Geometry.Vector (x, y)
-import Graphics.Canvas (Context2D, arc, beginPath, fill, fillRect, fillText, stroke, strokeRect, strokeText, withContext)
+import Graphics.Canvas (Context2D, arc, beginPath, fill, fillRect, fillText, lineTo, moveTo, stroke, strokeRect, strokeText, withContext)
 import Loglude.Data.Tree as Tree
-
----------- Types
-type ReporterOutput id =
-    { absoluteBounds :: HashMap id AABB
-    , relativeBounds :: HashMap id AABB
-    , idTree :: Tree id
-    }
-
----------- Constants
-emptyReporterOutput :: forall id. ReporterOutput id
-emptyReporterOutput =
-    { absoluteBounds: HashMap.empty
-    , relativeBounds: HashMap.empty
-    , idTree: empty
-    }
-
----------- Helpers
-mergeReporterOutputs :: forall id. Hashable id => ReporterOutput id -> ReporterOutput id -> ReporterOutput id
-mergeReporterOutputs a b =
-    { absoluteBounds: a.absoluteBounds `HashMap.union` b.absoluteBounds
-    , relativeBounds: a.relativeBounds `HashMap.union` b.relativeBounds
-    , idTree: a.idTree <|> b.idTree
-    }
 
 ---------- Implementation
 endShape :: forall id action r. Context2D -> Record (GeometryAttributes id action r) -> Effect Unit
@@ -74,6 +48,12 @@ render context = case _ of
             , start: 0.0
             , end: tau
             }
+        endShape context attributes
+        pure emptyReporterOutput
+    Line attributes -> withAttributes context attributes do
+        beginPath context
+        moveTo context (x attributes.from) (y attributes.from)
+        lineTo context (x attributes.to) (y attributes.to)
         endShape context attributes
         pure emptyReporterOutput
     Transform attributes -> withAttributes context attributes do

@@ -4,6 +4,7 @@ module Geometry.Base where
 import Loglude
 
 import Data.Array as Array
+import Data.HashMap as HashMap
 import Data.Lazy (Lazy)
 import Data.Lazy as Lazy
 import Data.Lens (traversed)
@@ -19,6 +20,7 @@ import Graphics.Canvas (Context2D)
 import Loglude as Opt
 import Math (pow)
 
+---------- Types
 type EventHandler payload action = (payload -> action)
 
 type CanvasMouseEvent = 
@@ -41,6 +43,7 @@ data Geometry :: Type -> Type -> Type
 data Geometry id action
     = Circle (Record (CircleAttributes id action + GeometryAttributes id action ()))
     | Rect (Record (RectAttributes id action + GeometryAttributes id action ()))
+    | Line (Record (LineAttributes id action + GeometryAttributes id action ()))
     | Group (Record (GroupAttributes id action + GeometryAttributes id action ()))
     | Text (Record (TextAttributes id action + GeometryAttributes id action ()))
     | Transform (Record (TransformAttributes id action + GeometryAttributes id action ()))
@@ -55,6 +58,14 @@ data ClickCheck
 
 type Attributes = Type -> Type -> Row Type -> Row Type
 
+-- | Indexed metrics of the data a reporter reported
+type ReporterOutput id =
+    { absoluteBounds :: HashMap id AABB
+    , relativeBounds :: HashMap id AABB
+    , idTree :: Tree id
+    }
+
+---------- Attributes most shapes contain
 type EventAttributes :: Attributes
 type EventAttributes id action r =
     ( onClick :: Opt (EventHandler CanvasMouseEvent action)
@@ -112,6 +123,14 @@ type ReporterAttributes f id action r =
     , reportRelativeBounds :: f Boolean
     | r )
 
+type LineAttributes :: Attributes
+type LineAttributes id action r =
+    ( from :: Vec2
+    , to :: Vec2
+    , dash :: Opt (Array Number)
+    , dashOffset :: Opt Number
+    | r )
+
 ---------- Constructor types
 type GeometryConstructor extra = 
     forall given action id.
@@ -141,6 +160,9 @@ lockBounds f geometry = LockBounds { target: f geometry, bounds: Lazy.defer \_ -
 text :: GeometryConstructor TextAttributes
 text = Closed.coerce >>> Text
 
+line :: GeometryConstructor LineAttributes
+line = Closed.coerce >>> Line
+
 mapAction :: forall id from to. (from -> to) -> Geometry id from -> Geometry id to
 mapAction map target = { target, map } # MapActionF # mkExists # MapAction
 
@@ -166,6 +188,10 @@ translate amount (Rect attributes) =
     Rect $ over _position ((+) amount) attributes
 translate amount (Text attributes) =
     Text $ over _position ((+) amount) attributes
+translate amount (Line attributes) = Line attributes
+    { from = amount + attributes.from
+    , to = amount + attributes.to
+    }
 translate amount (Group attributes) =
     Group $ over (_children <<< traversed) (translate amount) attributes
 translate amount (Reporter attributes) =
@@ -207,12 +233,14 @@ bounds (Text attributes) = Just do
     }
 bounds (MapAction inner) = inner # runExists (unwrap >>> _.target >>> bounds)
 bounds (Reporter { target }) = bounds target
+bounds (Line { from, to }) = AABB.fromPoints [from, to]
 bounds (None position) = Just { position, size: zero }
 
 -- | Returns a polygon surrounding the shape
 points :: forall id action. Ask Context2D => Geometry id action -> Array Vec2
 points (Transform { transform, target }) = points target <#> multiplyVector transform
 points (Reporter { target }) = points target
+points (Line { from, to }) = [from, to]
 points a = bounds a # maybe [] AABB.points
 
 pointInside :: forall id action. Ask Context2D => Vec2 -> Geometry id action -> Boolean
@@ -223,6 +251,7 @@ pointInside point (LockBounds { target }) = pointInside point target
 pointInside point shape@(Transform { target }) = pointInside projected target
     where
     projected = toLocalCoordinates shape point
+pointInside point (Line _) = false -- TODO: implement
 pointInside point shape = bounds shape # maybe false (AABB.pointInside point)
 
 -- TODO: find a way to cache the inverse
@@ -243,11 +272,27 @@ children _ _ = []
 attributes :: forall id action result. Geometry id action -> result -> (forall r. Record (GeometryAttributes id action r) -> result) -> result
 attributes (Circle attributes) _ f = f attributes
 attributes (Rect attributes) _ f = f attributes
+attributes (Line attributes) _ f = f attributes
 attributes (Group attributes) _ f = f attributes
 attributes (Text attributes) _ f = f attributes
 attributes (Transform attributes) _ f = f attributes
 attributes (None position) _ f = f $ (Closed.coerce {} :: Record (GeometryAttributes id action ()))
 attributes _ default _ = default
+
+mergeReporterOutputs :: forall id. Hashable id => ReporterOutput id -> ReporterOutput id -> ReporterOutput id
+mergeReporterOutputs a b =
+    { absoluteBounds: a.absoluteBounds `HashMap.union` b.absoluteBounds
+    , relativeBounds: a.relativeBounds `HashMap.union` b.relativeBounds
+    , idTree: a.idTree <|> b.idTree
+    }
+
+---------- Constants
+emptyReporterOutput :: forall id. ReporterOutput id
+emptyReporterOutput =
+    { absoluteBounds: HashMap.empty
+    , relativeBounds: HashMap.empty
+    , idTree: empty
+    }
 
 ---------- Lenses
 _position :: forall r. Lens' { position :: Vec2 | r } Vec2

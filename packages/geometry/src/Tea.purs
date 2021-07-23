@@ -30,8 +30,8 @@ import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
 import Geoemtry.Data.AABB (AABB)
-import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, attributes, children, pointInside, toLocalCoordinates)
-import Geometry.Render.Canvas (ReporterOutput, emptyReporterOutput, render)
+import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, ReporterOutput, attributes, children, emptyReporterOutput, pointInside, toLocalCoordinates)
+import Geometry.Render.Canvas (render)
 import Geometry.Vector (Vec2, x, y)
 import Graphics.Canvas (CanvasElement, Context2D, clearRect, setCanvasHeight, setCanvasWidth)
 import Loglude.Cancelable (Cancelable)

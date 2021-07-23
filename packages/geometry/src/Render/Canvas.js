@@ -7,7 +7,7 @@ const CTX_ATTRIBS = {
   baseline: "textBaseline",
   clip: "clip",
   compose: "globalCompositeOperation",
-  dash: "setLineDash",
+  dash: "!setLineDash",
   dashOffset: "lineDashOffset",
   direction: "direction",
   fill: "fillStyle",
@@ -33,6 +33,10 @@ const CTX_ATTRIBS = {
 exports.setAttributes = (ctx) => (attributes) => () => {
   for (const key in attributes) {
     if (!CTX_ATTRIBS[key]) continue;
+    if (CTX_ATTRIBS[key][0] === "!") {
+      ctx[CTX_ATTRIBS[key].slice(1)](attributes[key]);
+      continue;
+    }
 
     ctx[CTX_ATTRIBS[key]] = attributes[key];
   }
