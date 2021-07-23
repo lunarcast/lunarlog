@@ -220,13 +220,13 @@ launchTea tea = do
     Cancelable.subscribe raf loop
     Cancelable.subscribe (RR.changes renderStream) \_ -> do
         Ref.write true dirty
-    Cancelable.subscribe mousedown \ev -> do
+    Cancelable.subscribe clicks \ev -> do
         currentGeometry <- RR.read renderStream
         propagateActions $ dispatchEvent identity (checkMouseEvents _.onClick $ createMouseEvent ev) currentGeometry
     Cancelable.subscribe mouseup \ev -> do
         currentGeometry <- RR.read renderStream
         propagateActions $ dispatchEvent identity (checkMouseEvents _.onMouseup $ createMouseEvent ev) currentGeometry
-    Cancelable.subscribe clicks \ev -> do
+    Cancelable.subscribe mousedown \ev -> do
         currentGeometry <- RR.read renderStream
         propagateActions $ dispatchEvent identity (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
 
