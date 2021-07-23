@@ -79,8 +79,8 @@ mapUsingStream mapRead mapChanges (ReactiveRef { read, changes }) = ReactiveRef
     }
 
 -- | Reactive ref analogue of Aged.dropDuplicates
-dropDuplicates :: forall a. ReadableRef (Aged.Aged a) -> ReadableRef a
-dropDuplicates = mapUsingStream Aged.get Aged.dropDuplicates
+dropDuplicates :: forall a. ReadableRef a -> ReadableRef a
+dropDuplicates = mapUsingStream identity Aged.dropDuplicates
 
 -- | Write a value inside a ref and wait until the change has been propagated
 pushAndWait :: forall a. a -> WriteableRef a -> Aff Unit
