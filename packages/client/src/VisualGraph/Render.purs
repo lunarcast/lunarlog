@@ -2,6 +2,7 @@ module Lunarlog.Client.VisualGraph.Render where
 
 import Loglude
 
+import Data.Undefined.NoProblem (undefined)
 import Geometry (Axis(..), Geometry, bounds, x)
 import Geometry as Geometry
 import Geometry.Shapes.Flex (FlexLayout)
@@ -51,6 +52,7 @@ type RenderPatternInput =
     { lookupPattern :: NodeId -> Maybe NodeGraph.Node
     , pattern :: ReadableRef (Maybe NodeGraph.Pattern)
     , selectionIsNode :: ReadableRef Boolean
+    , hoveredPin :: ReadableRef (Maybe PinId)
     , visualPattern :: ReadableRef (Maybe VisualGraph.Pattern)
     , nodeId :: NodeId
     }
@@ -58,6 +60,7 @@ type RenderPatternInput =
 type RenderNestedPatternInput =
     { lookupPattern :: NodeId -> Maybe NodeGraph.Node
     , selectionIsNode :: Boolean
+    , hoveredPin :: Maybe PinId
     , pattern :: NodeGraph.Pattern
     , offset :: Number
     , nodeId :: NodeId
@@ -65,10 +68,11 @@ type RenderNestedPatternInput =
 
 ---------- Implementation
 renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry EditorGeometryId PatternAction)
-renderPattern { lookupPattern, pattern, visualPattern, nodeId, selectionIsNode } = ado
+renderPattern { lookupPattern, pattern, visualPattern, nodeId, selectionIsNode, hoveredPin } = ado
     inner <- ado
         pattern <- pattern
         selectionIsNode <- selectionIsNode 
+        hoveredPin <- hoveredPin
         in case pattern of
             Nothing -> Geometry.None zero
             Just pattern -> Flex.withMinimumSize $ renderPatternLayout 
@@ -77,9 +81,12 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId, selectionIsNode }
                 , offset: 0.0
                 , nodeId
                 , selectionIsNode
+                , hoveredPin
                 }
 
-    position <- visualPattern >>= maybe (pure zero) \visualPattern -> RR.readonly visualPattern.position # RR.dropDuplicates
+    position <- visualPattern >>= case _ of
+        Nothing -> pure zero 
+        Just visualPattern -> RR.readonly visualPattern.position # RR.dropDuplicates
 
     in Geometry.transform
         { transform: Transform.translate position
@@ -87,7 +94,7 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId, selectionIsNode }
         }
 
 renderPatternLayout :: Ask Context2D => RenderNestedPatternInput -> FlexLayout EditorGeometryId PatternAction
-renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeId, selectionIsNode } = Flex.createFlexLayout
+renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeId, selectionIsNode, hoveredPin } = Flex.createFlexLayout
     { flexAxis: Y
     , stretchChildren: true
     , wrap: \child -> Geometry.reporter
@@ -154,9 +161,12 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
                         { id: NestedPinDropZone id
                         , reportAbsoluteBounds: true
                         , target: Geometry.rect
-                            { position: vec2 xOffset halfItemSpacing
-                            , size: vec2 (x targetBounds.size - xOffset) (2.0 * pinRadius)
-                            , fill: "yellow"
+                            { position: vec2 xOffset 0.0
+                            , size: vec2 (x targetBounds.size - xOffset) (2.0 * pinRadius + itemSpacing)
+                            , fill: if hoveredPin == Just id 
+                                then opt pinColor 
+                                else undefined
+                            , alpha: 0.7
                             }
                         }
                     ]
@@ -180,6 +190,7 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
                 , nodeId: childId
                 , offset: offset + patternPadding
                 , selectionIsNode
+                , hoveredPin
                 }
 
 withSpacing :: forall id a. Ask Context2D => Geometry id a -> Geometry id a

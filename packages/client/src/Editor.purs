@@ -23,7 +23,7 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId, EditorState, HoverTarget(..), PatternAction(..), Selection(..), _mousePosition, _ruleNode, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId, EditorState, HoverTarget(..), PatternAction(..), Selection(..), _hovered, _hoveredPinDropZone, _mousePosition, _ruleNode, _selection, _visualRule, _visualRuleNode)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -41,8 +41,8 @@ rule = NodeGraph.Rule
             { name
             , arguments: NodeId <$> [id + 1, id + 2, id + 3]
             }
-        , NodeId (id + 1) /\ NodeGraph.Unify (NodeGraph.PinId 0)
-        , NodeId (id + 2) /\ NodeGraph.Unify (NodeGraph.PinId 1)
+        , NodeId (id + 1) /\ NodeGraph.Unify (NodeGraph.PinId id)
+        , NodeId (id + 2) /\ NodeGraph.Unify (NodeGraph.PinId $ id + 1)
         , NodeId (id + 3) /\ NodeGraph.PatternNode
             { name: "Tuple"
             , arguments:  NodeId <$> [id + 4, id + 5]
@@ -51,7 +51,7 @@ rule = NodeGraph.Rule
             { name: "Zero"
             , arguments: []
             }
-        , NodeId (id + 5) /\ NodeGraph.Unify (NodeGraph.PinId 2)
+        , NodeId (id + 5) /\ NodeGraph.Unify (NodeGraph.PinId $ id + 2)
         ] 
 
 myVisualPattern :: Effect (VisualGraph.Rule)
@@ -142,6 +142,7 @@ scene visualRule =
                             # RR.mapJusts Aged.dropDuplicates
                         , nodeId
                         , selectionIsNode: state <#> (_.selection >>> checkSelection) # RR.dropDuplicates
+                        , hoveredPin: state <#> preview (_hovered <<< _hoveredPinDropZone)
                         }
                     pure $ mapAction NodeAction geometry
                 bodyNodes

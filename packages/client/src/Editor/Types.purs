@@ -68,6 +68,7 @@ idToHovered _ = NothingHovered
 selectionToId :: Selection -> Maybe EditorGeometryId
 selectionToId (SelectedNode id) = Just $ NodeGeometry id
 selectionToId NoSelection = Nothing
+
 ---------- Lenses
 _nextId :: Lens' EditorState Natural
 _nextId = prop (Proxy :: _ "nextId")
@@ -107,6 +108,11 @@ _mousePosition = prop (Proxy :: _ "mousePosition")
 
 _hovered :: Lens' EditorState HoverTarget
 _hovered = prop (Proxy :: _ "hovered")
+
+_hoveredPinDropZone :: Prism' HoverTarget PinId
+_hoveredPinDropZone = prism' HoveredPinDropZone case _ of
+    HoveredPinDropZone id -> Just id
+    _ -> Nothing
 
 ---------- Typeclass isntances
 derive instance Eq EditorGeometryId
