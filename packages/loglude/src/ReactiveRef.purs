@@ -13,15 +13,19 @@ module Loglude.ReactiveRef
     , mapUsingStream
     , dropDuplicates
     , pushAndWait
+    , mapJusts
+    , dropNothings
     ) where
 
 import Prelude
 
 import Control.Plus (empty)
 import Data.Aged as Aged
+import Data.Compactable (compact)
 import Data.Lens (Lens', over, view)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Effect (Effect)
 import Effect.Aff (Aff)
@@ -82,6 +86,14 @@ mapUsingStream mapRead mapChanges (ReactiveRef { read, changes }) = ReactiveRef
 dropDuplicates :: forall a. ReadableRef a -> ReadableRef a
 dropDuplicates = mapUsingStream identity Aged.dropDuplicates
 
+-- | Run a function over the stream of existing values
+mapJusts :: forall a. (Stream.Discrete a -> Stream.Discrete a) -> ReadableRef (Maybe a) -> ReadableRef (Maybe a)
+mapJusts f = mapUsingStream identity (compact >>> f >>> map Just)
+
+-- | Do not emit any Nothings
+dropNothings :: forall a. ReadableRef (Maybe a) -> ReadableRef (Maybe a)
+dropNothings = mapJusts identity
+
 -- | Write a value inside a ref and wait until the change has been propagated
 pushAndWait :: forall a. a -> WriteableRef a -> Aff Unit
 pushAndWait updated ref = do
@@ -126,17 +138,21 @@ instance TypeEquals r () => Bind (ReactiveRef r) where
           changeStream :: Stream.Discrete _
           changeStream = Stream.makeEvent \emit -> do
             (cancelInner :: Ref.Ref (Effect Unit)) <- Ref.new (pure unit)
-            cancelOuter <- Stream.subscribe (r.changes <#> f) \inner -> do
-                Ref.read cancelInner # join
-                read inner >>= emit
-                canceler <- Stream.subscribe (changes inner) emit
-                Ref.write canceler cancelInner
+            let 
+              onNewRef :: ReactiveRef r _ -> Effect Unit
+              onNewRef inner = do
+                  Ref.read cancelInner # join
+                  read inner >>= emit
+                  canceler <- Stream.subscribe (changes inner) emit
+                  Ref.write canceler cancelInner
+            cancelOuter <- Stream.subscribe (r.changes <#> f) onNewRef
+            r.read <#> f >>= onNewRef
             pure do
                 Ref.read cancelInner # join
                 cancelOuter
         initial <- r.read <#> f >>= read 
         fromStream initial changeStream
-    
+
 instance TypeEquals r () => Monad (ReactiveRef r)
 
 ---------- Lenses
