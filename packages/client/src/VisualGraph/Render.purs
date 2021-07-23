@@ -49,9 +49,9 @@ data PinSide = LeftPin | RightPin
 
 type RenderPatternInput =
     { lookupPattern :: NodeId -> Maybe NodeGraph.Node
-    , pattern :: NodeGraph.Pattern
-    , selectionIsNode :: Boolean
-    , visualPattern :: VisualGraph.Pattern
+    , pattern :: ReadableRef (Maybe NodeGraph.Pattern)
+    , selectionIsNode :: ReadableRef Boolean
+    , visualPattern :: ReadableRef (Maybe VisualGraph.Pattern)
     , nodeId :: NodeId
     }
 
@@ -66,15 +66,21 @@ type RenderNestedPatternInput =
 ---------- Implementation
 renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry EditorGeometryId PatternAction)
 renderPattern { lookupPattern, pattern, visualPattern, nodeId, selectionIsNode } = ado
-    let 
-      inner = Flex.withMinimumSize $ renderPatternLayout 
-        { lookupPattern
-        , pattern
-        , offset: 0.0
-        , nodeId
-        , selectionIsNode
-        }
-    position <- RR.readonly visualPattern.position # RR.dropDuplicates
+    inner <- ado
+        pattern <- pattern
+        selectionIsNode <- selectionIsNode 
+        in case pattern of
+            Nothing -> Geometry.None zero
+            Just pattern -> Flex.withMinimumSize $ renderPatternLayout 
+                { lookupPattern
+                , pattern
+                , offset: 0.0
+                , nodeId
+                , selectionIsNode
+                }
+
+    position <- visualPattern >>= maybe (pure zero) \visualPattern -> RR.readonly visualPattern.position # RR.dropDuplicates
+
     in Geometry.transform
         { transform: Transform.translate position
         , target: inner
@@ -96,7 +102,7 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
                 , weight: 3.0
                 }
             , parentModifiers:
-                { onClick: \e -> SelectNode e $ pure nodeId
+                { onMousedown: \e -> SelectNode e $ pure nodeId
                 }
             }
         }

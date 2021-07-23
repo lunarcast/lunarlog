@@ -2,21 +2,20 @@ module Lunarlog.Editor where
 
 import Loglude
 
-import Data.Array as Array
+import Data.Aged as Aged
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.HashMap as HashMap
 import Data.MouseButton (nothingPressed)
 import Data.Traversable (sequence)
-import Debug (spy)
 import Effect.Aff (launchAff_)
-import Geometry (Geometry(..), Tea)
+import Geometry (Geometry, Tea)
 import Geometry as Geometry
 import Geometry.Base (mapAction)
 import Geometry.Tea (TeaM, createMouseEvent, eventStream, stopPropagation)
 import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (selectNestedNode, updateHovered)
+import Loglude.Editor.Actions (selectNestedNode, selectNode, updateHovered)
 import Loglude.ReactiveRef (writeable)
 import Loglude.ReactiveRef as RR
 import Loglude.Run.ExternalState (assign, get)
@@ -24,7 +23,7 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId, EditorState, HoverTarget(..), PatternAction(..), Selection(..), _mousePosition, _selection, _visualRule)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId, EditorState, HoverTarget(..), PatternAction(..), Selection(..), _mousePosition, _ruleNode, _selection, _visualRule, _visualRuleNode)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -92,7 +91,7 @@ scene visualRule =
     handleAction = case _ of
         NodeAction (SelectNode event path) -> do
             let nodeId = NonEmptyArray.head path
-            assign _selection $ SelectedNode nodeId
+            selectNode nodeId
             case NonEmptyArray.index path 1 of
                 Nothing -> pure unit
                 Just parent -> selectNestedNode { parent, nodeId }
@@ -127,40 +126,25 @@ scene visualRule =
             # RR.dropDuplicates
             <#> (view NodeGraph._ruleBody &&& view NodeGraph._ruleNodes)
             >>= \(bodyNodes /\ nodes) -> do
-                let asArray 
-                      = bodyNodes 
-                      <#> identity &&& flip HashMap.lookup nodes -- NodeId -> NodeId /\ Maybe Node
-                      <#> uncurry (Tuple >>> map) -- a /\ Maybe b -> Maybe (a /\ b)
-                      # Array.catMaybes
                 let 
-                  renderNode :: NodeId /\ NodeGraph.Node -> _
-                  renderNode (nodeId /\ (NodeGraph.Unify _)) = pure $ None zero
-                  renderNode (nodeId /\ (NodeGraph.PatternNode pattern)) = do
-                    let checkSelection = case _ of
-                          SelectedNode selected -> selected /= nodeId 
-                          _ -> false
+                  renderNode :: NodeId -> _
+                  renderNode nodeId = do
+                    let
+                      checkSelection = case _ of
+                        SelectedNode selected -> selected /= nodeId 
+                        _ -> false
 
-                    selectionIsNode <- state <#> _.selection <#> checkSelection # RR.dropDuplicates
-                    visualPattern <- visualPatternStream 
-                    case visualPattern of
-                        Just visualPattern -> ado
-                            geometry <- renderPattern 
-                                { lookupPattern: flip HashMap.lookup nodes
-                                , visualPattern
-                                , pattern
-                                , nodeId
-                                , selectionIsNode
-                                }
-                            in mapAction NodeAction geometry
-                        -- TODO: better error handling
-                        Nothing -> spy "aaaaaa" $ pure $ None zero
-                    where
-                    visualPatternStream 
-                        = state
-                        <#> _.visualRule 
-                        # RR.dropDuplicates 
-                        <#> preview (VisualGraph._ruleNodes <<< _atHashMap nodeId <<< _Just <<< VisualGraph._patternNode)
-                asArray
+                    geometry <- renderPattern 
+                        { lookupPattern: flip HashMap.lookup nodes
+                        , visualPattern: state <#> preview (_visualRuleNode nodeId <<< VisualGraph._patternNode) 
+                            # RR.mapJusts Aged.dropDuplicates
+                        , pattern: state <#> preview (_ruleNode nodeId <<< NodeGraph._patternNode)
+                            # RR.mapJusts Aged.dropDuplicates
+                        , nodeId
+                        , selectionIsNode: state <#> (_.selection >>> checkSelection) # RR.dropDuplicates
+                        }
+                    pure $ mapAction NodeAction geometry
+                bodyNodes
                     # map renderNode 
                     # sequence
                     # map (\children -> Geometry.group { children })

@@ -24,7 +24,7 @@ import Loglude.Run.ExternalState (assign, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, HoverTarget(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, freshNode, freshPin, idToHovered, selectionToId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, HoverTarget(..), Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, freshNode, freshPin, idToHovered, selectionToId)
 import Prelude (unless)
 
 ---------- Types
@@ -58,7 +58,6 @@ hovered except point output = case makeZipper output.idTree of
                 Just zipper -> Loop $ zipper /\ stack
                 Nothing -> finish stack
 
-
 updateHovered :: ClientM Unit
 updateHovered = do
     mousePosition <- use _mousePosition
@@ -71,8 +70,12 @@ updateHovered = do
         let currentlyHovered = case Array.head $ hovered except mousePosition report of
               Just hovered -> idToHovered hovered
               Nothing -> NothingHovered
-        liftEffect $ logPretty currentlyHovered
         assign _hovered currentlyHovered
+
+selectNode :: NodeId -> ClientM Unit
+selectNode nodeId = do
+    assign _selection $ SelectedNode nodeId
+    modifying _ruleBody $ Array.delete nodeId >>> flip Array.snoc nodeId
 
 -- | Respond to a user clicking on a nested node
 selectNestedNode :: { parent :: NodeId, nodeId :: NodeId } -> ClientM Unit
