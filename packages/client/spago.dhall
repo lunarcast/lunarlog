@@ -13,6 +13,7 @@
   , "debug"
   , "control"
   , "run"
+  , "debugged"
   , "lunarlog-prelude"
   , "lunarlog-geometry"
   , "lunarlog-core"
