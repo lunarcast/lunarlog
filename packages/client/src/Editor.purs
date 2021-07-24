@@ -5,8 +5,10 @@ import Loglude
 import Data.Aged as Aged
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.HashMap as HashMap
+import Data.Lens.Index (ix)
 import Data.MouseButton (nothingPressed)
 import Data.Traversable (sequence)
+import Debug (spy)
 import Effect.Aff (launchAff_)
 import Geometry (Geometry, Tea)
 import Geometry as Geometry
@@ -23,7 +25,7 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId, EditorState, HoverTarget(..), PatternAction(..), Selection(..), _hovered, _hoveredPinDropZone, _mousePosition, _ruleNode, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId, EditorState, PatternAction(..), Selection(..), _hovered, _mousePosition, _nestedPinDropZone, _ruleNode, _selection, _visualRule, _visualRuleNode)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -73,7 +75,7 @@ scene visualRule =
         { visualRule: visualRule
         , rule: rule
         , selection: NoSelection
-        , hovered: NothingHovered
+        , hovered: []
         , mouseMove: empty
         , mousePosition: zero
         , nextId: intToNat 13
@@ -129,14 +131,10 @@ scene visualRule =
             # RR.dropDuplicates
             <#> (view NodeGraph._ruleBody &&& view NodeGraph._ruleNodes)
             >>= \(bodyNodes /\ nodes) -> do
+                let a = spy "owo" bodyNodes 
                 let 
                   renderNode :: NodeId -> _
                   renderNode nodeId = do
-                    let
-                      checkSelection = case _ of
-                        SelectedNode selected -> selected /= nodeId 
-                        _ -> false
-
                     geometry <- renderPattern 
                         { lookupPattern: flip HashMap.lookup nodes
                         , visualPattern: state <#> preview (_visualRuleNode nodeId <<< VisualGraph._patternNode) 
@@ -145,7 +143,7 @@ scene visualRule =
                             # RR.mapJusts Aged.dropDuplicates
                         , nodeId
                         , selection: state <#> _.selection # RR.dropDuplicates
-                        , hoveredPin: state <#> preview (_hovered <<< _hoveredPinDropZone)
+                        , hoveredPin: state <#> preview (_hovered <<< ix 0 <<< _nestedPinDropZone)
                         }
                     pure $ mapAction NodeAction geometry
                 bodyNodes

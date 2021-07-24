@@ -3,7 +3,7 @@ module Lunarlog.Client.VisualGraph.Render where
 import Loglude
 
 import Data.Undefined.NoProblem (undefined)
-import Geometry (Axis(..), Geometry, bounds, x)
+import Geometry (Axis(..), Geometry, annotate, bounds, x)
 import Geometry as Geometry
 import Geometry.Shapes.Flex (FlexLayout)
 import Geometry.Shapes.Flex as Flex
@@ -87,7 +87,7 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hovere
         isSelected <- selection <#> (preview _selectedNode >>> maybe false ((==) nodeId)) # RR.dropDuplicates
         in Geometry.group 
             { children: [ flex ]
-            , alpha: if not isSelected then 1.0 else 0.9
+            , alpha: if not isSelected then 1.0 else 0.7
             }
 
     position <- visualPattern >>= case _ of
@@ -183,7 +183,7 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
         nodeId, Just (NodeGraph.Unify id) -> Flex.IsLayout $ Flex.createFlexLayout
             { flexAxis: X
             , arrangeChildren: Flex.SpaceBetween
-            , wrap: Geometry.lockBounds \target -> Geometry.group
+            , wrap:  Geometry.lockBounds \target -> annotate (NodeGeometry nodeId) $ Geometry.group
                 { children: [ target ] <> dashedLines id target
                 }
             , children: [ Flex.NotLayout $ pin id LeftPin $ -offset, Flex.NotLayout $ pin id RightPin 0.0 ]

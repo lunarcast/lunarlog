@@ -2,87 +2,60 @@ module Loglude.Editor.Actions where
 
 import Loglude
 
-import Control.Monad.Rec.Class (Step(..), tailRec)
 import Data.Array as Array
-import Data.HashMap as HashMap
-import Data.HashSet (HashSet)
 import Data.HashSet as HashSet
 import Data.Lens (traversed)
-import Data.List (List)
-import Data.List as List
 import Data.Vec as Vec
-import Data.ZipperArray as ZipperArray
-import Debug (spy)
 import Effect.Class.Console (log)
-import Geoemtry.Data.AABB as AABB
-import Geometry (Vec2)
-import Geometry.Base (ReporterOutput)
-import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentReport)
-import Loglude.Data.Tree (TreeZipper)
-import Loglude.Data.Tree as Tree
+import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentReport, currentlyHovered)
 import Loglude.ReactiveRef as RR
 import Loglude.Run.ExternalState (assign, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
-import Lunarlog.Core.NodeGraph (NodeId)
+import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, HoverTarget(..), Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, freshNode, freshPin, idToHovered, selectionToId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, freshNode, freshPin, selectionToId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
 
 ---------- Implementation
-pointInsideReport :: Vec2 -> EditorGeometryId -> ClientM Boolean
-pointInsideReport point reportId = absoluteBounds reportId <#> maybe false (AABB.pointInside point)
-
-isHovered :: Vec2 -> HoverTarget -> ClientM Boolean
-isHovered _ NothingHovered = pure false
-isHovered point (HoveredPinDropZone id) = pointInsideReport point $ NestedPinDropZone id
-isHovered _ _ = pure false -- Unimplemented
-
-hovered :: forall id. Hashable id => HashSet id -> Vec2 -> ReporterOutput id -> Array id 
-hovered except point output = case makeZipper output.idTree of
-    Just zipper -> tailRec go (zipper /\ List.Nil)
-    Nothing -> []
-    where
-    makeZipper = Tree.toZipper >>> map ZipperArray.goLast
-    finish = Array.fromFoldable >>> Done
-
-    go :: TreeZipper id /\ List id -> Step (TreeZipper id /\ List id) (Array id)
-    go (zipper /\ stack) = do
-        let { inner, children } = ZipperArray.current zipper
-        case AABB.pointInside point <$> HashMap.lookup inner output.absoluteBounds of
-            Just true | not $ HashSet.member inner except -> case makeZipper children of
-                Just zipper -> Loop $ zipper /\ List.Cons inner stack
-                Nothing -> finish $ List.Cons inner stack
-            _ -> case ZipperArray.goPrev zipper of
-                Just zipper -> Loop $ zipper /\ stack
-                Nothing -> finish stack
-
 updateHovered :: ClientM Unit
 updateHovered = do
     mousePosition <- use _mousePosition
-    previouslyHovered <- use _hovered
-    isStillHovered <- isHovered mousePosition previouslyHovered
-    unless isStillHovered do
-        report <- currentReport
-        selection <- use _selection
-        let except = maybe HashSet.empty HashSet.singleton $ selectionToId selection
-        let currentlyHovered = case Array.head $ spy "hoo" $ hovered except mousePosition report of
-              Just hovered -> idToHovered hovered
-              Nothing -> NothingHovered
-        assign _hovered currentlyHovered
+    selection <- use _selection
+    let except = maybe HashSet.empty HashSet.singleton $ selectionToId selection
+    hoverStack <- currentlyHovered except mousePosition
+    assign _hovered hoverStack
 
 selectNode :: NodeId -> ClientM Unit
 selectNode nodeId = do
     assign _selection $ SelectedNode nodeId
+
+    -- Mark the grabbed pattern as top-level
     modifying _ruleBody $ Array.delete nodeId >>> flip Array.snoc nodeId
+
+-- | Remove all data about a pin from the state
+deletePin :: PinId /\ NodeId -> ClientM Unit
+deletePin (pinId /\ pinNodeId) = do
+    assign (_atRuleNode pinNodeId) Nothing
 
 dropPattern :: NodeId -> ClientM Unit
 dropPattern nodeId = do
     use _hovered >>= case _ of
-        HoveredPinDropZone id -> do
-            -- deletePin id
-            pure unit
+        stack | [NestedPinDropZone id, NodeGeometry pinNodeId, NodeGeometry parent] <- Array.take 3 stack -> do
+            -- deletePin pinNodeId
+
+            -- Place dropped node inside the parent of the pin
+            modifying (_ruleNode parent <<< NodeGraph._patternNode <<< NodeGraph._patternArguments) $ 
+                map \child -> if child == pinNodeId 
+                    then nodeId
+                    else child
+
+            -- Remove visual data (eg: position) of the dropped node
+            assign (_atVisualRuleNode nodeId) Nothing
+
+            -- Remove node from rule body
+            modifying _ruleBody $ Array.delete nodeId
         _ -> pure unit
 
 -- | Respond to a user clicking on a nested node
@@ -98,9 +71,6 @@ selectNestedNode { parent, nodeId } = do
 
         -- Create visual node for grabbed pattern
         assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position }
-
-        -- Mark the grabbed pattern as top-level
-        modifying _ruleBody $ flip Array.snoc nodeId
 
         -- Remove the grabbed pattern from the argument list of the parent
         modifying (_ruleNode parent <<< NodeGraph._patternNode <<< NodeGraph._patternArguments <<< traversed) 

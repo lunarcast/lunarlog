@@ -29,10 +29,7 @@ data Selection
     = SelectedNode NodeId
     | NoSelection
 
-data HoverTarget
-    = HoveredPin PinId
-    | HoveredPinDropZone PinId
-    | NothingHovered
+type HoverTarget = Array EditorGeometryId
 
 type EditorState = 
     { rule :: NodeGraph.Rule
@@ -60,10 +57,6 @@ freshNode = fresh <#> natToInt <#> NodeGraph.NodeId
 selectionIsNode :: Selection -> Boolean
 selectionIsNode (SelectedNode _) = true
 selectionIsNode _ = false 
-
-idToHovered :: EditorGeometryId -> HoverTarget
-idToHovered (NestedPinDropZone id) = HoveredPinDropZone id
-idToHovered _ = NothingHovered
 
 selectionToId :: Selection -> Maybe EditorGeometryId
 selectionToId (SelectedNode id) = Just $ NodeGeometry id
@@ -114,31 +107,20 @@ _mousePosition = prop (Proxy :: _ "mousePosition")
 _hovered :: Lens' EditorState HoverTarget
 _hovered = prop (Proxy :: _ "hovered")
 
-_hoveredPinDropZone :: Prism' HoverTarget PinId
-_hoveredPinDropZone = prism' HoveredPinDropZone case _ of
-    HoveredPinDropZone id -> Just id
+_nestedPinDropZone :: Prism' EditorGeometryId PinId
+_nestedPinDropZone = prism' NestedPinDropZone case _ of
+    NestedPinDropZone id -> Just id
     _ -> Nothing
 
 ---------- Typeclass isntances
 derive instance Eq EditorGeometryId
-derive instance Eq HoverTarget
 
 derive instance Generic EditorGeometryId _
-derive instance Generic HoverTarget _
 
 instance Debug EditorGeometryId where
-    debug = genericDebug
-
-instance Debug HoverTarget where
     debug = genericDebug
 
 instance Hashable EditorGeometryId where
     hash = hash <<< case _ of
         NodeGeometry id -> Left id
         NestedPinDropZone id -> Right id
-
-instance Hashable HoverTarget where
-    hash = hash <<< case _ of
-        HoveredPin id -> Left $ Left id
-        HoveredPinDropZone id -> Left $ Right id
-        NothingHovered -> Right unit
