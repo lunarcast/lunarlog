@@ -15,6 +15,7 @@ module Geometry.Tea
     , relativeBounds
     , awaitRerender
     , currentReport
+    , currentlyHovered
     ) where
 
 import Loglude
@@ -31,6 +32,7 @@ import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
 import Geoemtry.Data.AABB (AABB)
 import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, ReporterOutput, attributes, children, emptyReporterOutput, pointInside, toLocalCoordinates)
+import Geometry.Hovered (hovered)
 import Geometry.Render.Canvas (render)
 import Geometry.Vector (Vec2, x, y)
 import Graphics.Canvas (CanvasElement, Context2D, clearRect, setCanvasHeight, setCanvasWidth)
@@ -120,6 +122,10 @@ createMouseEvent ev =
         (MouseEvent.clientY ev)
 
 ---------- Helpers
+-- | Get a stack of stuff a position hovers over using the current indexed report
+currentlyHovered :: forall state action id. Hashable id => HashSet id -> Vec2 -> TeaM state id action (Array id) 
+currentlyHovered except position = currentReport <#> hovered except position
+
 runTea :: 
     forall state id action. 
     Hashable id => 

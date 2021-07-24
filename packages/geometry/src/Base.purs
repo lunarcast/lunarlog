@@ -178,7 +178,7 @@ reporter = Closed.coerce >>> withDefaults >>> Reporter
         }
 
 annotate :: forall id action. id -> Geometry id action -> Geometry id action
-annotate id target = reporter { id, target }
+annotate id target = reporter { id, target, reportAbsoluteBounds: true }
 
 ---------- Helpers
 translate :: forall id action. Vec2 -> Geometry id action -> Geometry id action
