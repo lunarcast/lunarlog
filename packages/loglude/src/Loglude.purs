@@ -62,10 +62,14 @@ module Loglude
     , module Control.Plus
     , module Data.Natural
     , module Data.Debug
+    , module Data.HashSet
+    , module Control.Monad.Rec.Class
     , module Data.Tuple.Nested ) where
 
 import Prelude
 
+import Control.Monad.Rec.Class (Step(..), tailRec)
+import Data.HashSet (HashSet)
 import Loglude.Data.Debug (debugSpy, logPretty, myDebug, showPretty)
 import Data.Debug (class Debug, debug, genericDebug)
 import Loglude.Data.Tree (Tree(..))
