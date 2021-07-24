@@ -12,6 +12,7 @@ import Data.List (List)
 import Data.List as List
 import Data.Vec as Vec
 import Data.ZipperArray as ZipperArray
+import Debug (spy)
 import Effect.Class.Console (log)
 import Geoemtry.Data.AABB as AABB
 import Geometry (Vec2)
@@ -25,7 +26,6 @@ import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId)
 import Lunarlog.Core.NodeGraph as NodeGraph
 import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, HoverTarget(..), Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, freshNode, freshPin, idToHovered, selectionToId)
-import Prelude (unless)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -67,7 +67,7 @@ updateHovered = do
         report <- currentReport
         selection <- use _selection
         let except = maybe HashSet.empty HashSet.singleton $ selectionToId selection
-        let currentlyHovered = case Array.head $ hovered except mousePosition report of
+        let currentlyHovered = case Array.head $ spy "hoo" $ hovered except mousePosition report of
               Just hovered -> idToHovered hovered
               Nothing -> NothingHovered
         assign _hovered currentlyHovered
@@ -76,6 +76,14 @@ selectNode :: NodeId -> ClientM Unit
 selectNode nodeId = do
     assign _selection $ SelectedNode nodeId
     modifying _ruleBody $ Array.delete nodeId >>> flip Array.snoc nodeId
+
+dropPattern :: NodeId -> ClientM Unit
+dropPattern nodeId = do
+    use _hovered >>= case _ of
+        HoveredPinDropZone id -> do
+            -- deletePin id
+            pure unit
+        _ -> pure unit
 
 -- | Respond to a user clicking on a nested node
 selectNestedNode :: { parent :: NodeId, nodeId :: NodeId } -> ClientM Unit

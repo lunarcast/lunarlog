@@ -15,10 +15,10 @@ import Geometry.Tea (TeaM, createMouseEvent, eventStream, stopPropagation)
 import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (selectNestedNode, selectNode, updateHovered)
+import Loglude.Editor.Actions (dropPattern, selectNestedNode, selectNode, updateHovered)
 import Loglude.ReactiveRef (writeable)
 import Loglude.ReactiveRef as RR
-import Loglude.Run.ExternalState (assign, get)
+import Loglude.Run.ExternalState (assign, get, use)
 import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
@@ -99,6 +99,9 @@ scene visualRule =
             stopPropagation
         RefreshSelection event -> do
             when (nothingPressed event.buttons) do
+                use _selection >>= case _ of
+                    SelectedNode id -> dropPattern id
+                    _ -> pure unit
                 assign _selection NoSelection
         MouseUp event -> do
             handleAction $ RefreshSelection event
@@ -141,7 +144,7 @@ scene visualRule =
                         , pattern: state <#> preview (_ruleNode nodeId <<< NodeGraph._patternNode)
                             # RR.mapJusts Aged.dropDuplicates
                         , nodeId
-                        , selectionIsNode: state <#> (_.selection >>> checkSelection) # RR.dropDuplicates
+                        , selection: state <#> _.selection # RR.dropDuplicates
                         , hoveredPin: state <#> preview (_hovered <<< _hoveredPinDropZone)
                         }
                     pure $ mapAction NodeAction geometry

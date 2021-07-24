@@ -76,6 +76,11 @@ _nextId = prop (Proxy :: _ "nextId")
 _selection :: Lens' EditorState Selection
 _selection = prop (Proxy :: _ "selection")
 
+_selectedNode :: Prism' Selection NodeId
+_selectedNode = prism' SelectedNode case _ of
+    SelectedNode id -> Just id
+    _ -> Nothing
+
 _rule :: Lens' EditorState NodeGraph.Rule
 _rule = prop (Proxy :: _ "rule")
 

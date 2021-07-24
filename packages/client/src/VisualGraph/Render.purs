@@ -14,7 +14,7 @@ import Loglude.ReactiveRef as RR
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorGeometryId(..), PatternAction(..), patternActionWithParent)
+import Lunarlog.Editor.Types (EditorGeometryId(..), PatternAction(..), Selection, _selectedNode, patternActionWithParent)
 import Math (remainder)
 
 ---------- Constants
@@ -51,7 +51,7 @@ data PinSide = LeftPin | RightPin
 type RenderPatternInput =
     { lookupPattern :: NodeId -> Maybe NodeGraph.Node
     , pattern :: ReadableRef (Maybe NodeGraph.Pattern)
-    , selectionIsNode :: ReadableRef Boolean
+    , selection :: ReadableRef Selection
     , hoveredPin :: ReadableRef (Maybe PinId)
     , visualPattern :: ReadableRef (Maybe VisualGraph.Pattern)
     , nodeId :: NodeId
@@ -68,21 +68,27 @@ type RenderNestedPatternInput =
 
 ---------- Implementation
 renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry EditorGeometryId PatternAction)
-renderPattern { lookupPattern, pattern, visualPattern, nodeId, selectionIsNode, hoveredPin } = ado
+renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hoveredPin } = ado
     inner <- ado
-        pattern <- pattern
-        selectionIsNode <- selectionIsNode 
-        hoveredPin <- hoveredPin
-        in case pattern of
-            Nothing -> Geometry.None zero
-            Just pattern -> Flex.withMinimumSize $ renderPatternLayout 
-                { lookupPattern
-                , pattern
-                , offset: 0.0
-                , nodeId
-                , selectionIsNode
-                , hoveredPin
-                }
+        flex <- ado
+            pattern <- pattern
+            selectionIsNode <- selection <#> (preview _selectedNode >>> maybe false ((/=) nodeId)) # RR.dropDuplicates
+            hoveredPin <- hoveredPin
+            in case pattern of
+                Nothing -> Geometry.None zero
+                Just pattern -> Flex.withMinimumSize $ renderPatternLayout 
+                    { lookupPattern
+                    , pattern
+                    , offset: 0.0
+                    , nodeId
+                    , selectionIsNode
+                    , hoveredPin
+                    }
+        isSelected <- selection <#> (preview _selectedNode >>> maybe false ((==) nodeId)) # RR.dropDuplicates
+        in Geometry.group 
+            { children: [ flex ]
+            , alpha: if not isSelected then 1.0 else 0.9
+            }
 
     position <- visualPattern >>= case _ of
         Nothing -> pure zero 

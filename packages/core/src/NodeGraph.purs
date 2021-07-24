@@ -2,8 +2,6 @@ module Lunarlog.Core.NodeGraph where
 
 import Loglude
 
-import Data.Debug (class Debug)
-
 
 newtype NodeId = NodeId Int
 newtype PinId = PinId Int
