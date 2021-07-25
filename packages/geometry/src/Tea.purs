@@ -8,7 +8,6 @@ module Geometry.Tea
     , PropagationF
     , launchTea
     , stopPropagation
-    , currentGeometry
     , eventStream
     , createMouseEvent
     , absoluteBounds
@@ -20,6 +19,7 @@ module Geometry.Tea
 
 import Loglude
 
+import Data.Aged as Aged
 import Data.Array as Array
 import Data.HashMap as HashMap
 import Data.MouseButton (MouseButtons(..))
@@ -30,8 +30,10 @@ import Effect.Aff (launchAff_)
 import Effect.Ref as Ref
 import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
+import FRP.Stream as Strem
 import Geoemtry.Data.AABB (AABB)
 import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, ReporterOutput, attributes, children, emptyReporterOutput, pointInside, toLocalCoordinates)
+import Geometry.Base as Geometry
 import Geometry.Hovered (hovered)
 import Geometry.Render.Canvas (render)
 import Geometry.Vector (Vec2, x, y)
@@ -39,7 +41,7 @@ import Graphics.Canvas (CanvasElement, Context2D, clearRect, setCanvasHeight, se
 import Loglude.Cancelable (Cancelable)
 import Loglude.Cancelable as Cancelable
 import Loglude.ReactiveRef as RR
-import Loglude.Run.ExternalState (EXTERNAL_STATE, runStateEffectfully)
+import Loglude.Run.ExternalState (EXTERNAL_STATE, runStateUsingRef)
 import Prelude (Unit, identity, void)
 import Run (Step(..), interpret, liftAff, on, runAccumPure, runBaseAff', send)
 import Run as Run
@@ -56,9 +58,9 @@ type EventChecker id action = (forall zoom. ((zoom -> action) -> Geometry id zoo
 data PropagationF result
     = StopPropagation result
 
+data RenderF :: Type -> Type -> Type -> Type
 data RenderF id action result
     = AwaitRerender result
-    | CurrentGeometry (Geometry id action -> result)
     | CurrentReport (ReporterOutput id -> result)
     | AbsoluteBounds id (Maybe AABB -> result)
     | RelativeBounds id (Maybe AABB -> result)
@@ -79,7 +81,7 @@ type SetupArgs s a = { propagateAction :: a -> Aff Unit }
 
 type Tea state id action =
     { initialState :: state
-    , render :: Ask Context2D => ReadableRef state -> ReadableRef (Geometry id action)
+    , render :: Ask Context2D => Strem.Discrete state -> Strem.Discrete (Geometry id action)
     , handleAction :: action -> TeaM state id action Unit
     , setup :: SetupArgs state action -> Cancelable Unit
     }
@@ -93,9 +95,6 @@ data CanvasEvent
 ---------- Constructors
 stopPropagation :: forall rest. Run (PROPAGATION rest) Unit
 stopPropagation = Run.lift _propagation $ StopPropagation unit
-
-currentGeometry :: forall id action rest. Run (RENDER id action rest) (Geometry id action)
-currentGeometry = Run.lift _render $ CurrentGeometry identity
 
 absoluteBounds :: forall id action rest. id -> Run (RENDER id action rest) (Maybe AABB)
 absoluteBounds id = Run.lift _render $ AbsoluteBounds id identity
@@ -129,13 +128,12 @@ runTea ::
     forall state id action. 
     Hashable id => 
     Ref state -> 
-    WriteableRef state -> 
+    (state -> Effect Unit) -> 
     Stream.Notifier -> 
     Ref (ReporterOutput id) -> 
-    Geometry id action -> 
     TeaM state id action Unit -> 
     Aff (TeaResult state)
-runTea rawState state rerenders reports geometry = runRender >>> runStateEffectfully (Ref.read rawState) (flip Ref.write rawState) >>> runPropagation >>> map fst >>> runBaseAff'
+runTea rawState syncState rerenders reports = runRender >>> runStateUsingRef rawState >>> runPropagation >>> map fst >>> runBaseAff'
     where
     runRender = interpret (on _render handleRender send)
     runPropagation = runAccumPure (\current -> on _propagation (handlePropagation current >>> Loop) Done) Tuple { continuePropagation: true }
@@ -144,12 +142,11 @@ runTea rawState state rerenders reports geometry = runRender >>> runStateEffectf
     handlePropagation old (StopPropagation next) = old { continuePropagation = false } /\ next
 
     handleRender :: forall r. RenderF id action ~> Run (AFF + EXTERNAL_STATE state + EFFECT r)
-    handleRender (CurrentGeometry continue) = pure $ continue geometry
     handleRender (AbsoluteBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.absoluteBounds)
     handleRender (RelativeBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.relativeBounds)
     handleRender (CurrentReport continue) = liftEffect (Ref.read reports) <#> continue 
     handleRender (AwaitRerender next) = ado
-        liftEffect (Ref.read rawState >>= flip RR.write state)
+        liftEffect (Ref.read rawState >>= syncState)
         liftAff $ Cancelable.pull rerenders.event
         in next
 
@@ -186,17 +183,17 @@ launchTea tea = do
     dirty <- liftEffect $ Ref.new true
     indexedReport <- liftEffect $ Ref.new emptyReporterOutput
     rawState <- liftEffect $ Ref.new tea.initialState
-    state <- liftEffect $ RR.writeable tea.initialState
+    state <- liftEffect Stream.create
     rerenders <- liftEffect Stream.notifier
+    geometry <- liftEffect $ Ref.new (Geometry.None zero)
 
     let 
-        renderStream :: ReadableRef (Geometry id action)
-        renderStream = tea.render (RR.readonly state # RR.dropDuplicates)
+        renderStream :: Stream.Discrete (Geometry id action)
+        renderStream = tea.render (state.event # Aged.dropDuplicates)
 
-    let propagateAction action = do 
-          currentGeometry <- liftEffect $ RR.read renderStream
-          result <- runTea rawState state rerenders indexedReport currentGeometry $ tea.handleAction action
-          pure result.continuePropagation
+    let propagateAction action = ado
+          result <- runTea rawState state.push rerenders indexedReport $ tea.handleAction action
+          in result.continuePropagation
 
     let 
       propagateActions :: Array action -> Effect Unit
@@ -217,31 +214,33 @@ launchTea tea = do
           Ref.write true dirty
 
     let loop = const do
-          Ref.read rawState >>= flip RR.write state
+          Ref.read rawState >>= state.push
           Ref.read dirty >>= flip when do
             size <- RR.read windowSize
             clearRect ask { x: 0.0, y: 0.0, width: x size, height: y size }
-            RR.read renderStream >>= render ask >>= flip Ref.write indexedReport
+            Ref.read geometry >>= render ask >>= flip Ref.write indexedReport
             Ref.write false dirty
             Stream.notify rerenders
 
     Cancelable.subscribe raf loop
-    Cancelable.subscribe (RR.changes renderStream) \_ -> do
+    Cancelable.subscribe renderStream \current -> do
+        Ref.write current geometry
         Ref.write true dirty
     Cancelable.subscribe clicks \ev -> do
-        currentGeometry <- RR.read renderStream
+        currentGeometry <- Ref.read geometry
         propagateActions $ dispatchEvent identity (checkMouseEvents _.onClick $ createMouseEvent ev) currentGeometry
     Cancelable.subscribe mouseup \ev -> do
-        currentGeometry <- RR.read renderStream
+        currentGeometry <- Ref.read geometry
         propagateActions $ dispatchEvent identity (checkMouseEvents _.onMouseup $ createMouseEvent ev) currentGeometry
     Cancelable.subscribe mousedown \ev -> do
-        currentGeometry <- RR.read renderStream
+        currentGeometry <- Ref.read geometry
         propagateActions $ dispatchEvent identity (checkMouseEvents _.onMousedown $ createMouseEvent ev) currentGeometry
 
     Cancelable.subscribe (RR.changes windowSize) handleResize
 
     liftEffect (RR.read windowSize >>= handleResize)
     tea.setup { propagateAction: propagateAction >>> void }
+    liftEffect $ state.push tea.initialState
     where
     clicks = eventStream MouseEvent.fromEvent EventType.click
     mousedown = eventStream MouseEvent.fromEvent EventType.mousedown
