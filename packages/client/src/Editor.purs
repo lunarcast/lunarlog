@@ -9,7 +9,8 @@ import Data.Lens.Index (ix)
 import Data.MouseButton (nothingPressed)
 import Data.Traversable (sequence)
 import Effect.Aff (launchAff_)
-import Geometry (Geometry, Tea)
+import FRP.Stream as Stream
+import Geometry (Geometry, Tea, _position)
 import Geometry as Geometry
 import Geometry.Base (mapAction)
 import Geometry.Tea (TeaM, createMouseEvent, eventStream, stopPropagation)
@@ -17,9 +18,7 @@ import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.Lens (_atHashMap)
 import Loglude.Editor.Actions (dropPattern, selectNestedNode, selectNode, updateHovered)
-import Loglude.ReactiveRef (writeable)
-import Loglude.ReactiveRef as RR
-import Loglude.Run.ExternalState (assign, get, use)
+import Loglude.Run.ExternalState (assign, get, modifying, use)
 import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
@@ -55,23 +54,22 @@ rule = NodeGraph.Rule
         , NodeId (id + 5) /\ NodeGraph.Unify (NodeGraph.PinId $ id + 2)
         ] 
 
-myVisualPattern :: Effect (VisualGraph.Rule)
+myVisualPattern :: VisualGraph.Rule
 myVisualPattern = do
-    node1 <- { position: _ } <$> writeable (vec2 100.0 200.0)
-    node2 <- { position: _ } <$> writeable (vec2 400.0 200.0)
-    pure
-        { connections: HashMap.empty
-        , nodes: HashMap.fromArray
-            [ NodeId 0 /\ VisualGraph.PatternNode node1
-            , NodeId 6 /\ VisualGraph.PatternNode node2
-            ]
-        }
+    let node1 = { position: vec2 100.0 200.0 }
+    let node2 = { position: vec2 400.0 200.0 }
+    { connections: HashMap.empty
+    , nodes: HashMap.fromArray
+        [ NodeId 0 /\ VisualGraph.PatternNode node1
+        , NodeId 6 /\ VisualGraph.PatternNode node2
+        ]
+    }
 
 ---------- Implementation
-scene :: Ask Context2D => VisualGraph.Rule -> Tea EditorState EditorGeometryId EditorAction
-scene visualRule =
+scene :: Ask Context2D => Tea EditorState EditorGeometryId EditorAction
+scene =
     { initialState: 
-        { visualRule: visualRule
+        { visualRule: myVisualPattern
         , rule: rule
         , selection: NoSelection
         , hovered: []
@@ -117,30 +115,26 @@ scene visualRule =
                 NoSelection -> pure unit
                 SelectedNode id -> do
                     let delta = event.worldPosition - oldPosition
-                    get <#> preview (_visualRule <<< VisualGraph._ruleNodes <<< _atHashMap id <<< _Just <<< VisualGraph._patternNode)
-                        >>= case _ of
-                            Nothing -> pure unit
-                            Just pattern -> do
-                                liftEffect $ RR.modify ((+) delta) pattern.position
+                    modifying (_visualRule <<< VisualGraph._ruleNodes <<< _atHashMap id <<< _Just <<< VisualGraph._patternNode <<< _position) ((+) delta)
 
-    render :: Ask Context2D => ReadableRef EditorState -> ReadableRef (Geometry _ _)
+    render :: Ask Context2D => Stream.Discrete EditorState -> Stream.Discrete (Geometry _ _)
     render state = do
         state 
             <#> _.rule
-            # RR.dropDuplicates
+            # Aged.dropDuplicates
             <#> (view NodeGraph._ruleBody &&& view NodeGraph._ruleNodes)
-            >>= \(bodyNodes /\ nodes) -> do
+            # flip Stream.bind \(bodyNodes /\ nodes) -> Stream.do
                 let 
                   renderNode :: NodeId -> _
-                  renderNode nodeId = do
+                  renderNode nodeId = Stream.do
                     geometry <- renderPattern 
                         { lookupPattern: flip HashMap.lookup nodes
                         , visualPattern: state <#> preview (_visualRuleNode nodeId <<< VisualGraph._patternNode) 
-                            # RR.mapJusts Aged.dropDuplicates
+                            # Aged.dropDuplicates
                         , pattern: state <#> preview (_ruleNode nodeId <<< NodeGraph._patternNode)
-                            # RR.mapJusts Aged.dropDuplicates
+                            # Aged.dropDuplicates
                         , nodeId
-                        , selection: state <#> _.selection # RR.dropDuplicates
+                        , selection: state <#> _.selection # Aged.dropDuplicates
                         , hoveredPin: state <#> preview (_hovered <<< ix 0 <<< _nestedPinDropZone)
                         }
                     pure $ mapAction NodeAction geometry

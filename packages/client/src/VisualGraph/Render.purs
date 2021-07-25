@@ -2,7 +2,10 @@ module Lunarlog.Client.VisualGraph.Render where
 
 import Loglude
 
+import Data.Aged as Aged
 import Data.Undefined.NoProblem (undefined)
+import FRP.Stream (filterMap)
+import FRP.Stream as Stream
 import Geometry (Axis(..), Geometry, annotate, bounds, x)
 import Geometry as Geometry
 import Geometry.Shapes.Flex (FlexLayout)
@@ -10,7 +13,6 @@ import Geometry.Shapes.Flex as Flex
 import Geometry.TextBaseline as TextBaseline
 import Geometry.Transform as Transform
 import Graphics.Canvas (Context2D)
-import Loglude.ReactiveRef as RR
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
@@ -50,10 +52,10 @@ data PinSide = LeftPin | RightPin
 
 type RenderPatternInput =
     { lookupPattern :: NodeId -> Maybe NodeGraph.Node
-    , pattern :: ReadableRef (Maybe NodeGraph.Pattern)
-    , selection :: ReadableRef Selection
-    , hoveredPin :: ReadableRef (Maybe PinId)
-    , visualPattern :: ReadableRef (Maybe VisualGraph.Pattern)
+    , pattern :: Stream.Discrete (Maybe NodeGraph.Pattern)
+    , selection :: Stream.Discrete Selection
+    , hoveredPin :: Stream.Discrete (Maybe PinId)
+    , visualPattern :: Stream.Discrete (Maybe VisualGraph.Pattern)
     , nodeId :: NodeId
     }
 
@@ -67,12 +69,12 @@ type RenderNestedPatternInput =
     }
 
 ---------- Implementation
-renderPattern :: Ask Context2D => RenderPatternInput -> ReadableRef (Geometry EditorGeometryId PatternAction)
+renderPattern :: Ask Context2D => RenderPatternInput -> Stream.Discrete (Geometry EditorGeometryId PatternAction)
 renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hoveredPin } = ado
     inner <- ado
         flex <- ado
             pattern <- pattern
-            selectionIsNode <- selection <#> (preview _selectedNode >>> maybe false ((/=) nodeId)) # RR.dropDuplicates
+            selectionIsNode <- selection <#> (preview _selectedNode >>> maybe false ((/=) nodeId)) # Aged.dropDuplicates
             hoveredPin <- hoveredPin
             in case pattern of
                 Nothing -> Geometry.None zero
@@ -84,15 +86,17 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hovere
                     , selectionIsNode
                     , hoveredPin
                     }
-        isSelected <- selection <#> (preview _selectedNode >>> maybe false ((==) nodeId)) # RR.dropDuplicates
+        isSelected <- selection <#> (preview _selectedNode >>> maybe false ((==) nodeId)) # Aged.dropDuplicates
         in Geometry.group 
             { children: [ flex ]
             , alpha: if not isSelected then 1.0 else 0.7
             }
 
-    position <- visualPattern >>= case _ of
-        Nothing -> pure zero 
-        Just visualPattern -> RR.readonly visualPattern.position # RR.dropDuplicates
+    position <- visualPattern 
+        # filterMap case _ of
+            Nothing -> Nothing 
+            Just visualPattern -> Just visualPattern.position 
+        # Aged.dropDuplicates
 
     in Geometry.transform
         { transform: Transform.translate position

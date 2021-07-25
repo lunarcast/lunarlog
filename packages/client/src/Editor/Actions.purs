@@ -6,14 +6,13 @@ import Data.Array as Array
 import Data.HashSet as HashSet
 import Data.Lens (traversed)
 import Data.Vec as Vec
-import Effect.Class.Console (log)
-import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentReport, currentlyHovered)
-import Loglude.ReactiveRef as RR
+import Geometry (_position)
+import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
 import Loglude.Run.ExternalState (assign, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, freshNode, freshPin, selectionToId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -64,13 +63,11 @@ selectNestedNode { parent, nodeId } = do
     newPin <- freshPin
     newPinNode <- freshNode
     absoluteBounds (NodeGeometry nodeId) >>= traverse_ \bounds -> do
-        position <- liftEffect $ RR.writeable bounds.position
-
         -- Create replacement pin
         assign (_atRuleNode newPinNode) $ Just $ NodeGraph.Unify newPin
 
         -- Create visual node for grabbed pattern
-        assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position }
+        assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position: bounds.position }
 
         -- Remove the grabbed pattern from the argument list of the parent
         modifying (_ruleNode parent <<< NodeGraph._patternNode <<< NodeGraph._patternArguments <<< traversed) 
@@ -78,8 +75,6 @@ selectNestedNode { parent, nodeId } = do
 
         -- Trigger rerender for the grabbed pattern to resize
         awaitRerender
-
-        currentReport <#> _.idTree <#> showPretty >>= log
 
         -- Move the resized pattern to look "good" relative to the mouse
         absoluteBounds (NodeGeometry nodeId) >>= traverse_ \bounds' -> do
@@ -90,4 +85,4 @@ selectNestedNode { parent, nodeId } = do
             let fixedRelativeMousePosition = Vec.zipWith (/) (Vec.zipWith (*) bounds'.size relativeMousePosition) bounds.size
             let newPosition = mousePosition - fixedRelativeMousePosition
 
-            liftEffect $ RR.write newPosition position
+            assign (_visualRuleNode nodeId <<< VisualGraph._patternNode <<< _position) newPosition

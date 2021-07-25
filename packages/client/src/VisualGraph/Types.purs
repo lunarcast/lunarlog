@@ -7,7 +7,7 @@ import Lunarlog.Core.NodeGraph (NodeId, PinId)
 
 ---------- Types
 type Pattern =
-    { position :: WriteableRef Vec2 }
+    { position :: Vec2 }
 
 data Node
    = PatternNode Pattern

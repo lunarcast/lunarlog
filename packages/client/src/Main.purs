@@ -6,7 +6,7 @@ import Geometry (launchTea)
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Loglude.Cancelable as Cancelable
 import Lunarlog.Canvas (fixDpi)
-import Lunarlog.Editor (myVisualPattern, scene)
+import Lunarlog.Editor (scene)
 
 main :: Effect Unit
 main = do
@@ -17,5 +17,4 @@ main = do
         let zoom = 2.0
 
         Cancelable.perform do
-            pattern <- liftEffect myVisualPattern
-            provide ctx $ launchTea $ scene pattern
+            provide ctx $ launchTea scene
