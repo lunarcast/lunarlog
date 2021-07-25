@@ -17,7 +17,7 @@ import Geometry.Tea (TeaM, createMouseEvent, eventStream, stopPropagation)
 import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (dropPattern, selectNestedNode, selectNode, updateHovered)
+import Loglude.Editor.Actions (dropPattern, rememberMousePosition, selectNestedNode, selectNode, updateHovered)
 import Loglude.Run.ExternalState (assign, get, modifying, use)
 import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
@@ -89,6 +89,7 @@ scene =
     handleAction :: EditorAction -> TeaM EditorState EditorGeometryId EditorAction Unit
     handleAction = case _ of
         NodeAction (SelectNode event path) -> do
+            rememberMousePosition event
             let nodeId = NonEmptyArray.head path
             selectNode nodeId
             case NonEmptyArray.index path 1 of
@@ -106,7 +107,7 @@ scene =
             handleAction $ RefreshSelection event
         MouseMove event -> do
             oldPosition <- get <#> view _mousePosition
-            assign _mousePosition $ event.worldPosition
+            rememberMousePosition event
 
             handleAction $ RefreshSelection event
             updateHovered

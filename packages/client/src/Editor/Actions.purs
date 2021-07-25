@@ -6,7 +6,7 @@ import Data.Array as Array
 import Data.HashSet as HashSet
 import Data.Lens (traversed)
 import Data.Vec as Vec
-import Geometry (_position)
+import Geometry (CanvasMouseEvent, _position)
 import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
 import Loglude.Run.ExternalState (assign, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
@@ -56,6 +56,10 @@ dropPattern nodeId = do
             -- Remove node from rule body
             modifying _ruleBody $ Array.delete nodeId
         _ -> pure unit
+
+-- | Update the last mouse position in the state
+rememberMousePosition :: CanvasMouseEvent -> ClientM Unit
+rememberMousePosition event = assign _mousePosition $ event.worldPosition
 
 -- | Respond to a user clicking on a nested node
 selectNestedNode :: { parent :: NodeId, nodeId :: NodeId } -> ClientM Unit
