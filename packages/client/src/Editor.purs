@@ -8,7 +8,6 @@ import Data.HashMap as HashMap
 import Data.Lens.Index (ix)
 import Data.MouseButton (nothingPressed)
 import Data.Traversable (sequence)
-import Debug (spy)
 import Effect.Aff (launchAff_)
 import Geometry (Geometry, Tea)
 import Geometry as Geometry
@@ -131,7 +130,6 @@ scene visualRule =
             # RR.dropDuplicates
             <#> (view NodeGraph._ruleBody &&& view NodeGraph._ruleNodes)
             >>= \(bodyNodes /\ nodes) -> do
-                let a = spy "owo" bodyNodes 
                 let 
                   renderNode :: NodeId -> _
                   renderNode nodeId = do

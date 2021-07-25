@@ -38,9 +38,8 @@ import Geometry.Vector (Vec2, x, y)
 import Graphics.Canvas (CanvasElement, Context2D, clearRect, setCanvasHeight, setCanvasWidth)
 import Loglude.Cancelable (Cancelable)
 import Loglude.Cancelable as Cancelable
-import Loglude.ReactiveRef (pushAndWait)
 import Loglude.ReactiveRef as RR
-import Loglude.Run.ExternalState (EXTERNAL_STATE, get, runStateUsingReactiveRef)
+import Loglude.Run.ExternalState (EXTERNAL_STATE, runStateEffectfully)
 import Prelude (Unit, identity, void)
 import Run (Step(..), interpret, liftAff, on, runAccumPure, runBaseAff', send)
 import Run as Run
@@ -129,13 +128,14 @@ currentlyHovered except position = currentReport <#> hovered except position
 runTea :: 
     forall state id action. 
     Hashable id => 
+    Ref state -> 
     WriteableRef state -> 
     Stream.Notifier -> 
     Ref (ReporterOutput id) -> 
     Geometry id action -> 
     TeaM state id action Unit -> 
     Aff (TeaResult state)
-runTea pushState rerenders reports geometry = runRender >>> runStateUsingReactiveRef pushState >>> runPropagation >>> map fst >>> runBaseAff'
+runTea rawState state rerenders reports geometry = runRender >>> runStateEffectfully (Ref.read rawState) (flip Ref.write rawState) >>> runPropagation >>> map fst >>> runBaseAff'
     where
     runRender = interpret (on _render handleRender send)
     runPropagation = runAccumPure (\current -> on _propagation (handlePropagation current >>> Loop) Done) Tuple { continuePropagation: true }
@@ -149,7 +149,7 @@ runTea pushState rerenders reports geometry = runRender >>> runStateUsingReactiv
     handleRender (RelativeBounds id continue) = liftEffect (Ref.read reports) <#> \report -> continue (HashMap.lookup id report.relativeBounds)
     handleRender (CurrentReport continue) = liftEffect (Ref.read reports) <#> continue 
     handleRender (AwaitRerender next) = ado
-        get >>= \s -> liftAff $ pushAndWait s pushState
+        liftEffect (Ref.read rawState >>= flip RR.write state)
         liftAff $ Cancelable.pull rerenders.event
         in next
 
@@ -185,16 +185,17 @@ launchTea :: forall state id action. Hashable id => Ask Context2D => Tea state i
 launchTea tea = do
     dirty <- liftEffect $ Ref.new true
     indexedReport <- liftEffect $ Ref.new emptyReporterOutput
+    rawState <- liftEffect $ Ref.new tea.initialState
     state <- liftEffect $ RR.writeable tea.initialState
     rerenders <- liftEffect Stream.notifier
 
     let 
         renderStream :: ReadableRef (Geometry id action)
-        renderStream = tea.render (RR.readonly state)
+        renderStream = tea.render (RR.readonly state # RR.dropDuplicates)
 
     let propagateAction action = do 
           currentGeometry <- liftEffect $ RR.read renderStream
-          result <- runTea state rerenders indexedReport currentGeometry $ tea.handleAction action
+          result <- runTea rawState state rerenders indexedReport currentGeometry $ tea.handleAction action
           pure result.continuePropagation
 
     let 
@@ -216,6 +217,7 @@ launchTea tea = do
           Ref.write true dirty
 
     let loop = const do
+          Ref.read rawState >>= flip RR.write state
           Ref.read dirty >>= flip when do
             size <- RR.read windowSize
             clearRect ask { x: 0.0, y: 0.0, width: x size, height: y size }
