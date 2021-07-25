@@ -11,12 +11,14 @@ module Loglude.Run.ExternalState
     , use
     , runStateEffectfully
     , runStateUsingReactiveRef
+    , runStateUsingRef
     , runStateUsingReactiveRefAsync
     ) where
 
 import Loglude hiding (set)
 
 import Data.Lens as Lens
+import Effect.Ref as Ref
 import Loglude.ReactiveRef as RR
 import Run (liftAff)
 import Run as Run
@@ -45,6 +47,9 @@ runStateEffectfully get set = Run.interpret (Run.on _externalState handle Run.se
     handle :: forall a. ExternalState s a -> Run (EFFECT r) a
     handle (Get continue) = liftEffect get <#> continue
     handle (Put state next) = liftEffect (set state) $> next
+
+runStateUsingRef :: forall s r. Ref s -> Run (EXTERNAL_STATE s + EFFECT r) ~> Run (EFFECT r)
+runStateUsingRef ref = runStateEffectfully (Ref.read ref) (flip Ref.write ref)
 
 runStateUsingReactiveRef :: forall s r. WriteableRef s -> Run (EXTERNAL_STATE s + EFFECT r) ~> Run (EFFECT r)
 runStateUsingReactiveRef ref = runStateEffectfully (RR.read ref) (flip RR.write ref)
