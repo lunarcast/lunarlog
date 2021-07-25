@@ -85,6 +85,8 @@ type GeometryAttributes id action r =
     , label :: Opt String
     | EventAttributes id action r )
 
+type MultiStepRenderer id action = Geometry id action /\ Array (ReporterOutput id -> Geometry id action)
+
 ---------- Attribute types for individual shapes
 type RectAttributes :: Attributes
 type RectAttributes id a r = AABBLike r

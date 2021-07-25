@@ -32,10 +32,10 @@ import FRP.Event.AnimationFrame (animationFrame)
 import FRP.Stream as Stream
 import FRP.Stream as Strem
 import Geoemtry.Data.AABB (AABB)
-import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, ReporterOutput, attributes, children, emptyReporterOutput, pointInside, toLocalCoordinates)
+import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, ReporterOutput, MultiStepRenderer, attributes, children, emptyReporterOutput, pointInside, toLocalCoordinates)
 import Geometry.Base as Geometry
 import Geometry.Hovered (hovered)
-import Geometry.Render.Canvas (render)
+import Geometry.Render.Canvas (multiStepRender)
 import Geometry.Vector (Vec2, x, y)
 import Graphics.Canvas (CanvasElement, Context2D, clearRect, setCanvasHeight, setCanvasWidth)
 import Loglude.Cancelable (Cancelable)
@@ -81,7 +81,7 @@ type SetupArgs s a = { propagateAction :: a -> Aff Unit }
 
 type Tea state id action =
     { initialState :: state
-    , render :: Ask Context2D => Strem.Discrete state -> Strem.Discrete (Geometry id action)
+    , render :: Ask Context2D => Strem.Discrete state -> Strem.Discrete (MultiStepRenderer id action)
     , handleAction :: action -> TeaM state id action Unit
     , setup :: SetupArgs state action -> Cancelable Unit
     }
@@ -185,10 +185,11 @@ launchTea tea = do
     rawState <- liftEffect $ Ref.new tea.initialState
     state <- liftEffect Stream.create
     rerenders <- liftEffect Stream.notifier
+    renderer <- liftEffect $ Ref.new (Geometry.None zero /\ []) 
     geometry <- liftEffect $ Ref.new (Geometry.None zero)
 
     let 
-        renderStream :: Stream.Discrete (Geometry id action)
+        renderStream :: Stream.Discrete (MultiStepRenderer id action)
         renderStream = tea.render (state.event # Aged.dropDuplicates)
 
     let propagateAction action = ado
@@ -218,13 +219,15 @@ launchTea tea = do
           Ref.read dirty >>= flip when do
             size <- RR.read windowSize
             clearRect ask { x: 0.0, y: 0.0, width: x size, height: y size }
-            Ref.read geometry >>= render ask >>= flip Ref.write indexedReport
+            Ref.read renderer >>= multiStepRender ask >>= \(thisGeometry /\ report) -> do
+                Ref.write report indexedReport
+                Ref.write thisGeometry geometry
             Ref.write false dirty
             Stream.notify rerenders
 
     Cancelable.subscribe raf loop
     Cancelable.subscribe renderStream \current -> do
-        Ref.write current geometry
+        Ref.write current renderer
         Ref.write true dirty
     Cancelable.subscribe clicks \ev -> do
         currentGeometry <- Ref.read geometry
