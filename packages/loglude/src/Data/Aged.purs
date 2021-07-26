@@ -23,6 +23,7 @@ dropDuplicatesOn getter = Stream.withLast >>> filterMap hasChanged
 
     differentAges (Just a) b = case preview getter a, preview getter b of
         Just a, Just b -> not $ unsafeRefEq a b 
+        Nothing, Nothing -> false
         _, _ -> true
     differentAges Nothing _ = true 
 
