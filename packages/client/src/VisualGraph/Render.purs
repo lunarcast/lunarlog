@@ -4,58 +4,27 @@ import Loglude
 
 import Data.Aged as Aged
 import Data.Undefined.NoProblem (undefined)
-import FRP.Stream (filterMap)
 import FRP.Stream as Stream
 import Geometry (Axis(..), Geometry, annotate, bounds, x)
 import Geometry as Geometry
-import Geometry.Shapes.Flex (FlexLayout)
+import Geometry.Shapes.Flex (FlexLayout, mapLayoutChild)
 import Geometry.Shapes.Flex as Flex
 import Geometry.TextBaseline as TextBaseline
 import Geometry.Transform as Transform
 import Graphics.Canvas (Context2D)
+import Loglude.Editor.Settings (connectionPreviewWeight, halfItemSpacing, itemSpacing, patternBackground, patternFont, patternPadding, patternStrokeColor, patternTextColor, pinColor, pinRadius)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorGeometryId(..), PatternAction(..), Selection, _selectedNode, patternActionWithParent)
-import Math (remainder)
-
----------- Constants
-patternBackground :: String
-patternBackground = "#272345"
-
-patternStrokeColor :: String
-patternStrokeColor = "#1A1730"
-
-patternTextColor :: String
-patternTextColor = "#DEEE93"
-
-pinColor :: String
-pinColor = "#1E88E5"
-
-patternFont :: String
-patternFont = "22px Source Code Pro"
-
-patternPadding :: Number
-patternPadding = 30.0
-
-itemSpacing :: Number
-itemSpacing = 16.0
-
-halfItemSpacing :: Number
-halfItemSpacing = itemSpacing / 2.0
-
-pinRadius :: Number
-pinRadius = 15.0
+import Lunarlog.Editor.Types (EditorGeometryId(..), PatternAction(..), PinSide(..), Selection, _selectedNode, patternActionWithParent)
 
 ---------- Types
-data PinSide = LeftPin | RightPin
-
 type RenderPatternInput =
     { lookupPattern :: NodeId -> Maybe NodeGraph.Node
-    , pattern :: Stream.Discrete (Maybe NodeGraph.Pattern)
+    , pattern :: Stream.Discrete NodeGraph.Pattern
     , selection :: Stream.Discrete Selection
     , hoveredPin :: Stream.Discrete (Maybe PinId)
-    , visualPattern :: Stream.Discrete (Maybe VisualGraph.Pattern)
+    , visualPattern :: Stream.Discrete VisualGraph.Pattern
     , nodeId :: NodeId
     }
 
@@ -76,27 +45,21 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hovere
             pattern <- pattern
             selectionIsNode <- selection <#> (preview _selectedNode >>> maybe false ((/=) nodeId)) # Aged.dropDuplicates
             hoveredPin <- hoveredPin
-            in case pattern of
-                Nothing -> Geometry.None zero
-                Just pattern -> Flex.withMinimumSize $ renderPatternLayout 
-                    { lookupPattern
-                    , pattern
-                    , offset: 0.0
-                    , nodeId
-                    , selectionIsNode
-                    , hoveredPin
-                    }
+            in Flex.withMinimumSize $ renderPatternLayout 
+                { lookupPattern
+                , pattern
+                , offset: 0.0
+                , nodeId
+                , selectionIsNode
+                , hoveredPin
+                }
         isSelected <- selection <#> (preview _selectedNode >>> maybe false ((==) nodeId)) # Aged.dropDuplicates
         in Geometry.group 
             { children: [ flex ]
             , alpha: if not isSelected then 1.0 else 0.7
             }
 
-    position <- visualPattern 
-        # filterMap case _ of
-            Nothing -> Nothing 
-            Just visualPattern -> Just visualPattern.position 
-        # Aged.dropDuplicates
+    position <- visualPattern <#> _.position
 
     in Geometry.transform
         { transform: Transform.translate position
@@ -182,7 +145,9 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
                     ]
                 }
             
-    argumentGeometries = arguments <#> (identity &&& lookupPattern) <#> uncurry case _, _ of
+    argumentGeometries = arguments 
+        <#> (identity &&& lookupPattern) 
+        <#> uncurry case _, _ of
         _, Nothing -> Flex.NotLayout $ Geometry.None zero
         nodeId, Just (NodeGraph.Unify id) -> Flex.IsLayout $ Flex.createFlexLayout
             { flexAxis: X
@@ -193,7 +158,7 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
             , children: [ Flex.NotLayout $ pin id LeftPin $ -offset, Flex.NotLayout $ pin id RightPin 0.0 ]
             }  
         childId, Just (NodeGraph.PatternNode pattern) -> Flex.IsLayout
-            $ Flex.wrapLayout (withSpacing >>> Geometry.mapAction (patternActionWithParent nodeId))
+            $ Flex.wrapLayout withSpacing
             $ renderPatternLayout
                 { lookupPattern
                 , pattern
@@ -202,6 +167,7 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
                 , selectionIsNode
                 , hoveredPin
                 }
+        <#> mapLayoutChild (Geometry.mapAction (patternActionWithParent nodeId))
 
 withSpacing :: forall id a. Ask Context2D => Geometry id a -> Geometry id a
 withSpacing target = Geometry.aabbPadding
@@ -222,10 +188,10 @@ dashedPinConnector { patternWidth, y, xOffset, sign } = Geometry.line
     where
     totalWidth = patternWidth - xOffset
     adjustedY = y + weight * sign / 2.0
-    weight = 4.0
+    weight = connectionPreviewWeight
 
-pin :: forall id. Ask Context2D => PinId -> PinSide -> Number -> Geometry id PatternAction
-pin id side extraOffset = pinCircle # Geometry.lockBounds \locked -> Geometry.transform
+pin :: Ask Context2D => PinId -> PinSide -> Number -> Geometry EditorGeometryId PatternAction
+pin id side extraOffset = pinCircle # Geometry.lockBounds \locked -> annotate (PinGeometry id side) $ Geometry.transform
     { target: locked
     , transform: Transform.translate (vec2 offset 0.0)
     }
@@ -234,6 +200,7 @@ pin id side extraOffset = pinCircle # Geometry.lockBounds \locked -> Geometry.tr
         { radius: pinRadius
         , position: zero
         , fill: pinColor 
+        , onMousedown: \event -> SelectPin event id []
         }
 
     offset = extraOffset + case side of

@@ -3,27 +3,31 @@ module Lunarlog.Editor where
 import Loglude
 
 import Data.Aged as Aged
+import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
+import Data.Compactable (compact)
 import Data.HashMap as HashMap
 import Data.Lens.Index (ix)
 import Data.MouseButton (nothingPressed)
 import Data.Traversable (sequence)
 import Effect.Aff (launchAff_)
 import FRP.Stream as Stream
-import Geometry (Geometry, Tea, _position)
+import Geoemtry.Data.AABB as AABB
+import Geometry (Geometry, MultiStepRenderer, ReporterOutput, Tea, _position, x)
 import Geometry as Geometry
 import Geometry.Base (mapAction)
 import Geometry.Tea (TeaM, createMouseEvent, eventStream, stopPropagation)
 import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (dropPattern, rememberMousePosition, selectNestedNode, selectNode, updateHovered)
+import Loglude.Editor.Actions (dropPattern, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
+import Loglude.Editor.Components.Connection (connection)
 import Loglude.Run.ExternalState (assign, get, modifying, use)
 import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId, EditorState, PatternAction(..), Selection(..), _hovered, _mousePosition, _nestedPinDropZone, _ruleNode, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), PinSide(..), Selection(..), _hovered, _mousePosition, _nestedPinDropZone, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -97,12 +101,22 @@ scene =
                 Just parent -> selectNestedNode { parent, nodeId }
             -- We do not want to select more than one thing at once
             stopPropagation
+        NodeAction (SelectPin event pinId path) -> do
+            rememberMousePosition event
+
+            for_ (Array.last path) (selectPin pinId)
+
+            -- We do not want to select more than one thing at once
+            stopPropagation
         RefreshSelection event -> do
             when (nothingPressed event.buttons) do
                 use _selection >>= case _ of
-                    SelectedNode id -> dropPattern id
+                    SelectedNode id -> do
+                        dropPattern id
+                        removeSelection
                     _ -> pure unit
-                assign _selection NoSelection
+            where
+            removeSelection = assign _selection NoSelection
         MouseUp event -> do
             handleAction $ RefreshSelection event
         MouseMove event -> do
@@ -112,15 +126,18 @@ scene =
             handleAction $ RefreshSelection event
             updateHovered
 
-            get <#> view _selection >>= case _ of
-                NoSelection -> pure unit
-                SelectedNode id -> do
+            get <#> preview (_selection <<< _selectedNode) >>= traverse_ \id -> do
                     let delta = event.worldPosition - oldPosition
                     modifying (_visualRule <<< VisualGraph._ruleNodes <<< _atHashMap id <<< _Just <<< VisualGraph._patternNode <<< _position) ((+) delta)
 
-    render :: Ask Context2D => Stream.Discrete EditorState -> Stream.Discrete (Geometry _ _)
-    render state = do
-        state 
+    render :: Stream.Discrete EditorState -> Stream.Discrete (MultiStepRenderer _ _)
+    render state = ado
+        step1 <- step1 state
+        step2 <- step2 state
+        in step1 /\ [step2]
+        
+    step1 :: Stream.Discrete EditorState -> Stream.Discrete (Geometry _ _)
+    step1 state = state 
             <#> _.rule
             # Aged.dropDuplicates
             <#> (view NodeGraph._ruleBody &&& view NodeGraph._ruleNodes)
@@ -130,16 +147,47 @@ scene =
                   renderNode nodeId = Stream.do
                     geometry <- renderPattern 
                         { lookupPattern: flip HashMap.lookup nodes
-                        , visualPattern: state <#> preview (_visualRuleNode nodeId <<< VisualGraph._patternNode) 
-                            # Aged.dropDuplicates
-                        , pattern: state <#> preview (_ruleNode nodeId <<< NodeGraph._patternNode)
-                            # Aged.dropDuplicates
                         , nodeId
+                        , visualPattern: state <#> preview (_visualRuleNode nodeId <<< VisualGraph._patternNode) 
+                            # compact # Aged.dropDuplicates
+                        , pattern: state <#> preview (_ruleNode nodeId <<< NodeGraph._patternNode)
+                            # compact # Aged.dropDuplicates
                         , selection: state <#> _.selection # Aged.dropDuplicates
                         , hoveredPin: state <#> preview (_hovered <<< ix 0 <<< _nestedPinDropZone)
+                            # Aged.dropDuplicates
+                            # Aged.dropDuplicatesOn _Just
                         }
                     pure $ mapAction NodeAction geometry
                 bodyNodes
                     # map renderNode 
                     # sequence
                     # map (\children -> Geometry.group { children })
+
+    step2 :: Stream.Discrete EditorState -> Stream.Discrete (ReporterOutput _ -> Geometry _ _)
+    step2 state = connectionPreview state
+
+connectionPreview :: 
+    Ask Context2D => 
+    Stream.Discrete EditorState -> 
+    Stream.Discrete (ReporterOutput EditorGeometryId -> Geometry EditorGeometryId EditorAction)
+connectionPreview state = ado
+    selectedPin <- state 
+        <#> preview (_selection <<< _selectedPin) 
+        # Aged.dropDuplicatesOn _Just
+    mousePosition <- state <#> view _mousePosition # Aged.dropDuplicates
+    in renderConnection selectedPin mousePosition
+    where
+    renderConnection Nothing _ _ = Geometry.None zero 
+    renderConnection (Just pinId) mousePosition report = 
+        case lookupPin LeftPin, lookupPin RightPin of
+            Just a, Just b -> connection $ { from: pickSide a b, to: mousePosition } 
+            Just from, Nothing -> connection { from, to: mousePosition }
+            Nothing, Just from -> connection { from, to: mousePosition }
+            _, _ -> Geometry.None zero
+        where
+        lookupPin side = HashMap.lookup (PinGeometry pinId side) report.absoluteBounds
+            <#> AABB.center
+
+        pickSide left right = if x mousePosition < (x left + x right) / 2.0 then left else right
+
+    

@@ -2,6 +2,7 @@ module Lunarlog.Editor.Types where
 
 import Loglude
 
+import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import FRP.Stream as Stream
 import Geometry (Vec2, CanvasMouseEvent)
@@ -13,11 +14,16 @@ import Lunarlog.Core.NodeGraph as NodeGraph
 ---------- Types
 data PatternAction
     = SelectNode CanvasMouseEvent (NonEmptyArray NodeId)
+    | SelectPin CanvasMouseEvent PinId (Array NodeId)
+
+-- | A pin can either be on the left or the right side of a node
+data PinSide = LeftPin | RightPin
 
 -- | Different ids we can use to query the bounds of the geometry tree
 data EditorGeometryId
     = NodeGeometry NodeId
     | NestedPinDropZone PinId
+    | PinGeometry PinId PinSide
 
 data EditorAction
     = NodeAction PatternAction
@@ -27,6 +33,7 @@ data EditorAction
 
 data Selection
     = SelectedNode NodeId
+    | SelectedPin PinId
     | NoSelection
 
 type HoverTarget = Array EditorGeometryId
@@ -44,6 +51,7 @@ type EditorState =
 ---------- Helpers
 patternActionWithParent :: NodeId -> PatternAction -> PatternAction
 patternActionWithParent parent (SelectNode event path) = SelectNode event (path `NonEmptyArray.snoc` parent)
+patternActionWithParent parent (SelectPin event pin path) = SelectPin event pin (path `Array.snoc` parent)
 
 fresh :: forall r. Run (EXTERNAL_STATE EditorState r) Natural
 fresh = use _nextId <* modifying _nextId succ 
@@ -58,9 +66,9 @@ selectionIsNode :: Selection -> Boolean
 selectionIsNode (SelectedNode _) = true
 selectionIsNode _ = false 
 
-selectionToId :: Selection -> Maybe EditorGeometryId
-selectionToId (SelectedNode id) = Just $ NodeGeometry id
-selectionToId NoSelection = Nothing
+selectionToNodeId :: Selection -> Maybe EditorGeometryId
+selectionToNodeId (SelectedNode id) = Just $ NodeGeometry id
+selectionToNodeId _ = Nothing
 
 ---------- Lenses
 _nextId :: Lens' EditorState Natural
@@ -72,6 +80,11 @@ _selection = prop (Proxy :: _ "selection")
 _selectedNode :: Prism' Selection NodeId
 _selectedNode = prism' SelectedNode case _ of
     SelectedNode id -> Just id
+    _ -> Nothing
+
+_selectedPin :: Prism' Selection PinId
+_selectedPin = prism' SelectedPin case _ of
+    SelectedPin id -> Just id
     _ -> Nothing
 
 _rule :: Lens' EditorState NodeGraph.Rule
@@ -113,14 +126,25 @@ _nestedPinDropZone = prism' NestedPinDropZone case _ of
     _ -> Nothing
 
 ---------- Typeclass isntances
+derive instance Eq PinSide
 derive instance Eq EditorGeometryId
 
+derive instance Generic PinSide _
 derive instance Generic EditorGeometryId _
 
 instance Debug EditorGeometryId where
     debug = genericDebug
 
+instance Debug PinSide where
+    debug = genericDebug
+
+instance Hashable PinSide where
+    hash = hash <<< case _ of
+        LeftPin -> false
+        RightPin -> true
+
 instance Hashable EditorGeometryId where
     hash = hash <<< case _ of
-        NodeGeometry id -> Left id
+        NodeGeometry id -> Left $ Left id
+        PinGeometry id side -> Left $ Right (id /\ side)
         NestedPinDropZone id -> Right id

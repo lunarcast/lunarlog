@@ -6,13 +6,14 @@ import Data.Array as Array
 import Data.HashSet as HashSet
 import Data.Lens (traversed)
 import Data.Vec as Vec
+import Debug (traceM)
 import Geometry (CanvasMouseEvent, _position)
 import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
 import Loglude.Run.ExternalState (assign, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -22,16 +23,28 @@ updateHovered :: ClientM Unit
 updateHovered = do
     mousePosition <- use _mousePosition
     selection <- use _selection
-    let except = maybe HashSet.empty HashSet.singleton $ selectionToId selection
+    let except = maybe HashSet.empty HashSet.singleton $ selectionToNodeId selection
     hoverStack <- currentlyHovered except mousePosition
     assign _hovered hoverStack
 
+-- | Move a node on top of all the others
+toTop :: NodeId -> ClientM Unit
+toTop nodeId = modifying _ruleBody $ Array.delete nodeId >>> flip Array.snoc nodeId 
+
+-- | Run when the user clicks a node
 selectNode :: NodeId -> ClientM Unit
 selectNode nodeId = do
     assign _selection $ SelectedNode nodeId
 
     -- Mark the grabbed pattern as top-level
-    modifying _ruleBody $ Array.delete nodeId >>> flip Array.snoc nodeId
+    toTop nodeId
+
+-- | Run when the user clicks a pin
+selectPin :: PinId -> NodeId -> ClientM Unit
+selectPin pinId topmostNodeId = do
+    assign _selection $ SelectedPin pinId
+    toTop topmostNodeId
+    traceM { pinId, topmostNodeId }
 
 -- | Remove all data about a pin from the state
 deletePin :: PinId /\ NodeId -> ClientM Unit
