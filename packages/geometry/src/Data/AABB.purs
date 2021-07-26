@@ -30,6 +30,10 @@ union a b = fromMinMax
     , max: Vec.zipWith max (toMinMax a).max (toMinMax b).max
     }
 
+-- | Calculate the center of some bounding box
+center :: AABB -> Vec2
+center { position, size } = position + map (_ / 2.0) size
+
 -- | Calculate wether a point is inside a rect
 pointInside :: Vec2 -> AABB -> Boolean
 pointInside point { position, size } = point `greaterThan` position && point `smallerThan` (position + size)

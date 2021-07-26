@@ -9,6 +9,7 @@ module Geometry.Shapes.Flex
     , withMinimumSize
     , createFlexLayout
     , wrapLayout
+    , mapLayoutChild
     ) where
 
 import Loglude
@@ -21,7 +22,9 @@ import Geometry (Attributes, Context2D, Geometry(..), bounds, buildFromAxis, gro
 import Geometry as Geometry
 import Geometry.Vector (Vec2, Axis, rmapAxis)
 import Loglude as Opt
+import Prelude (max)
 
+---------- Types
 data Arrangement
     = ArrangeStart
     | ArrangeEnd
@@ -56,6 +59,8 @@ type FlexLayout id action =
     , position :: Vec2
     }
 
+---------- Helpers
+-- | Apply some sane defaults to some flex settings
 withDefaults :: forall id action. Record (FlexInputAttributes Opt id action ()) -> Record (FlexInputAttributes Id id action ())
 withDefaults attributes = 
     { stretchChildren: Opt.fromOpt true attributes.stretchChildren
@@ -68,13 +73,21 @@ withDefaults attributes =
     , flexAxis: attributes.flexAxis
     }
 
-withFixedSize :: forall id action. FlexLayout id action -> Vec2 -> Geometry id action
-withFixedSize { fixSize } size = fixSize size 
+-- | Run some function over the resulting geometry held by a layout child
+mapLayoutChild :: forall id action id' action'. Ask Context2D => (Geometry id action -> Geometry id' action') -> LayoutChild id action -> LayoutChild id' action'
+mapLayoutChild f (NotLayout geometry) = NotLayout (f geometry)
+mapLayoutChild f (IsLayout layout) = IsLayout (wrapLayout f layout)
 
+-- | Create a geometry out of a layout by trying to take up a fixed size
+withFixedSize :: forall id action. FlexLayout id action -> Vec2 -> Geometry id action
+withFixedSize { fixSize, minimumSize } size = fixSize $ max minimumSize size 
+
+-- | Create a geometry taking up the minimum size a layout needs.
 withMinimumSize :: forall id action. FlexLayout id action -> Geometry id action
 withMinimumSize { fixSize, minimumSize } = fixSize minimumSize
 
-wrapLayout :: forall id action. Ask Context2D => (Geometry id action -> Geometry id action) -> FlexLayout id action -> FlexLayout id action
+-- | Wrap the resulting geometry of a layout in some extra construction.
+wrapLayout :: forall id action id' action'. Ask Context2D => (Geometry id action -> Geometry id' action') -> FlexLayout id action -> FlexLayout id' action'
 wrapLayout wrapper { minimumSize, position, fixSize } = { position, minimumSize: wrappedMinimumSize, fixSize: \size -> fixSize (size - deltaSize) # wrapper }
     where
     deltaSize :: Vec2
@@ -84,7 +97,7 @@ wrapLayout wrapper { minimumSize, position, fixSize } = { position, minimumSize:
     wrappedMinimumSize = wrapSize minimumSize
 
     wrapSize :: Vec2 -> Vec2
-    wrapSize size = maybe zero _.size $ bounds $ wrapper $ rect { position: position, size }
+    wrapSize size = maybe zero _.size $ bounds $ wrapper $ rect { position, size }
 
 -- | Create a flex layout
 createFlexLayout :: forall given id action. Ask Context2D => Closed.Coerce given (Record (FlexInputAttributes Opt id action ())) => given -> FlexLayout id action
