@@ -6,14 +6,13 @@ import Data.Array as Array
 import Data.HashSet as HashSet
 import Data.Lens (traversed)
 import Data.Vec as Vec
-import Debug (traceM)
 import Geometry (CanvasMouseEvent, _position)
 import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
 import Loglude.Run.ExternalState (assign, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleConnection, _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -42,9 +41,13 @@ selectNode nodeId = do
 -- | Run when the user clicks a pin
 selectPin :: PinId -> NodeId -> ClientM Unit
 selectPin pinId topmostNodeId = do
-    assign _selection $ SelectedPin pinId
-    toTop topmostNodeId
-    traceM { pinId, topmostNodeId }
+    use _selection >>= case _ of
+        SelectedPin selected | selected /= pinId -> do
+            assign (_atRuleConnection selected) $ Just pinId
+            assign _selection NoSelection
+        _ -> do
+            assign _selection $ SelectedPin pinId
+            toTop topmostNodeId
 
 -- | Remove all data about a pin from the state
 deletePin :: PinId /\ NodeId -> ClientM Unit

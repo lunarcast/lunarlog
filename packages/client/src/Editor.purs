@@ -2,6 +2,7 @@ module Lunarlog.Editor where
 
 import Loglude
 
+import Control.Apply (lift2, lift3)
 import Data.Aged as Aged
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
@@ -13,12 +14,13 @@ import Data.Traversable (sequence)
 import Effect.Aff (launchAff_)
 import FRP.Stream as Stream
 import Geoemtry.Data.AABB as AABB
-import Geometry (Geometry, MultiStepRenderer, ReporterOutput, Tea, _position, x)
+import Geometry (Geometry, MultiStepRenderer, Tea, Vec2, ReporterOutput, _position, x)
 import Geometry as Geometry
 import Geometry.Base (mapAction)
 import Geometry.Tea (TeaM, createMouseEvent, eventStream, stopPropagation)
 import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
+import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Data.Lens (_atHashMap)
 import Loglude.Editor.Actions (dropPattern, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
 import Loglude.Editor.Components.Connection (connection)
@@ -27,7 +29,7 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), PinSide(..), Selection(..), _hovered, _mousePosition, _nestedPinDropZone, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), PinSide(..), Selection(..), _hovered, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -37,7 +39,7 @@ rule = NodeGraph.Rule
     { head: NodeId 0
     , body: [NodeId 0, NodeId 6]
     , nodes: HashMap.fromArray $ mkNodes "Exmaple pattern" 0 <> mkNodes "Super duper mega long name" 6
-    , connections: HashMap.empty
+    , connections: BiHashMap.empty
     }
     where
     mkNodes name id = 
@@ -164,7 +166,37 @@ scene =
                     # map (\children -> Geometry.group { children })
 
     step2 :: Stream.Discrete EditorState -> Stream.Discrete (ReporterOutput _ -> Geometry _ _)
-    step2 state = connectionPreview state
+    step2 state = ado
+        connections <- connections state
+        preview <- connectionPreview state 
+        in \report -> Geometry.group
+            { children: [connections report, preview report]
+            }
+
+lookupBothPinSides :: 
+    ReporterOutput EditorGeometryId -> 
+    NodeGraph.PinId -> 
+    Maybe (Vec2 /\ Vec2)
+lookupBothPinSides report pinId = lift2 (/\) (lookupPin LeftPin) (lookupPin RightPin)
+    where
+    lookupPin side = do
+        boundingBox <- HashMap.lookup (PinGeometry pinId side) report.absoluteBounds
+        pure $ AABB.center boundingBox
+
+connections :: 
+    Ask Context2D => 
+    Stream.Discrete EditorState -> 
+    Stream.Discrete (ReporterOutput EditorGeometryId -> Geometry EditorGeometryId EditorAction)
+connections state =state
+    <#> view _ruleConnections
+    # Aged.dropDuplicates
+    <#> BiHashMap.connections
+    <#> \connections report -> Geometry.group
+        { children: connections <#> 
+            \(from /\ to) -> renderConnection 
+                (lookupBothPinSides report from) 
+                (lookupBothPinSides report to)
+        }
 
 connectionPreview :: 
     Ask Context2D => 
@@ -175,19 +207,24 @@ connectionPreview state = ado
         <#> preview (_selection <<< _selectedPin) 
         # Aged.dropDuplicatesOn _Just
     mousePosition <- state <#> view _mousePosition # Aged.dropDuplicates
-    in renderConnection selectedPin mousePosition
-    where
-    renderConnection Nothing _ _ = Geometry.None zero 
-    renderConnection (Just pinId) mousePosition report = 
-        case lookupPin LeftPin, lookupPin RightPin of
-            Just a, Just b -> connection $ { from: pickSide a b, to: mousePosition } 
-            Just from, Nothing -> connection { from, to: mousePosition }
-            Nothing, Just from -> connection { from, to: mousePosition }
+    in \report -> renderConnection 
+        (selectedPin >>= lookupBothPinSides report)
+        (Just (mousePosition /\ mousePosition))
+
+
+renderConnection :: Maybe (Vec2 /\ Vec2) -> Maybe (Vec2 /\ Vec2) -> Geometry EditorGeometryId EditorAction
+renderConnection left right = 
+        case start, lift3 pickSide right middleRight (map x start) of
+            Just from, Just to -> connection { from, to } 
             _, _ -> Geometry.None zero
         where
-        lookupPin side = HashMap.lookup (PinGeometry pinId side) report.absoluteBounds
-            <#> AABB.center
+        start = lift3 pickSide left middleLeft middleRight
+        
+        middleLeft = middle <$> left
+        middleRight = middle <$> right
 
-        pickSide left right = if x mousePosition < (x left + x right) / 2.0 then left else right
+        middle (left /\ right) = (x left + x right) / 2.0
+
+        pickSide (left /\ right) thisMiddle otherMiddle = if otherMiddle > thisMiddle then right else left
 
     

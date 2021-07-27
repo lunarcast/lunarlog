@@ -6,6 +6,7 @@ import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import FRP.Stream as Stream
 import Geometry (Vec2, CanvasMouseEvent)
+import Loglude.Data.BiHashMap (_atBiHashMap)
 import Loglude.Run.ExternalState (EXTERNAL_STATE, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
@@ -89,6 +90,12 @@ _selectedPin = prism' SelectedPin case _ of
 
 _rule :: Lens' EditorState NodeGraph.Rule
 _rule = prop (Proxy :: _ "rule")
+
+_ruleConnections :: Lens' EditorState (BiHashMap PinId)
+_ruleConnections = _rule <<< NodeGraph._ruleConnections
+
+_atRuleConnection :: PinId -> Lens EditorState EditorState (HashSet PinId) (Maybe PinId)
+_atRuleConnection id = _rule <<< NodeGraph._ruleConnections <<< _atBiHashMap id
 
 _ruleBody :: Lens' EditorState (Array NodeId)
 _ruleBody = _rule <<< NodeGraph._ruleBody

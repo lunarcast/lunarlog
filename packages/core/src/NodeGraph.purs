@@ -2,6 +2,8 @@ module Lunarlog.Core.NodeGraph where
 
 import Loglude
 
+import Loglude.Data.BiHashMap (BiHashMap)
+
 
 newtype NodeId = NodeId Int
 newtype PinId = PinId Int
@@ -19,7 +21,7 @@ newtype Rule = Rule
     { head :: NodeId
     , body :: Array NodeId
     , nodes :: HashMap NodeId Node
-    , connections :: HashMap PinId PinId
+    , connections :: BiHashMap PinId
     }
 
 data LunarlogType
@@ -60,6 +62,9 @@ _patternNode = prism' PatternNode case _ of
 _patternArguments :: Lens' Pattern (Array NodeId)
 _patternArguments = prop (Proxy :: _ "arguments")
 
+_ruleConnections :: Lens' Rule (BiHashMap PinId)
+_ruleConnections = _Newtype <<< prop (Proxy :: _ "connections")
+
 ---------- Typeclass instances
 derive newtype instance Show PinId
 derive newtype instance Show NodeId
@@ -69,6 +74,9 @@ derive newtype instance Debug NodeId
 
 derive instance Eq NodeId
 derive instance Eq PinId
+
+derive newtype instance Ord NodeId
+derive newtype instance Ord PinId
 
 derive newtype instance Hashable NodeId
 derive newtype instance Hashable PinId
