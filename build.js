@@ -6,12 +6,15 @@ const production = process.env.NODE_ENV === "production";
 
 esbuild
   .build({
-    entryPoints: ["src/index.js"],
+    entryPoints: ["src/index.tsx"],
     bundle: true,
     minify: production,
     outdir: "dist",
     watch: true,
     plugins: [PurescriptPlugin(), sassPlugin()],
     sourcemap: "both",
+    jsxFactory: "h",
+    jsxFragment: "Fragment",
+    inject: ["./src/preact-shim.ts"],
   })
   .catch((_e) => process.exit(1));

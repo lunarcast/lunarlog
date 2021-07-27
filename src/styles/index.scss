@@ -6,8 +6,16 @@ html {
   width: 100%;
 }
 
-#canvas {
+#app > .app__layer {
   height: 100%;
   width: 100%;
+
+  top: 0;
+  left: 0;
+
+  position: absolute;
+}
+
+#app > #canvas {
   background: #17142a;
 }
