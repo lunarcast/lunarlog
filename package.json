@@ -4,6 +4,7 @@
     "dev": "rm -rf dist && mkdir dist && cp public/* dist -r && node ./build & live-server dist"
   },
   "devDependencies": {
+    "@types/node": "^16.4.3",
     "esbuild": "^0.12.9",
     "esbuild-plugin-purescript": "^1.0.2",
     "esbuild-sass-plugin": "^1.4.7",

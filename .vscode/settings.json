@@ -1,3 +1,4 @@
 {
-  "purescript.preludeModule": "Loglude"
+  "purescript.preludeModule": "Loglude",
+  "typescript.tsdk": "node_modules/typescript/lib"
 }

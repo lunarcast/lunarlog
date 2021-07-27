@@ -1,3 +1,6 @@
+@import "./theme.scss";
+@import "./components/tabs.scss";
+
 body,
 html {
   padding: 0;
@@ -14,8 +17,5 @@ html {
   left: 0;
 
   position: absolute;
-}
-
-#app > #canvas {
-  background: #17142a;
+  background: $very-dark;
 }
