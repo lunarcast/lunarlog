@@ -54,6 +54,9 @@ _ruleNodes = _Newtype <<< prop (Proxy :: _ "nodes")
 _ruleBody :: Lens' Rule (Array NodeId)
 _ruleBody = _Newtype <<< prop (Proxy :: _ "body")
 
+_ruleHead :: Lens' Rule NodeId
+_ruleHead = _Newtype <<< prop (Proxy :: _ "head")
+
 _patternNode :: Prism' Node Pattern
 _patternNode = prism' PatternNode case _ of
     PatternNode pattern -> Just pattern
