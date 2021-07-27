@@ -3,12 +3,14 @@ module Loglude.Data.BiHashMap
     , lookup
     , insert
     , delete
+    , deleteConnection
     , empty
     , half
     , toHashMap
     , insertMany
     , connections
     , _atBiHashMap
+    , _atBiHashMapConnection
     ) where
 
 import Prelude
@@ -21,8 +23,8 @@ import Data.HashMap as HashMap
 import Data.HashSet (HashSet)
 import Data.HashSet as HashSet
 import Data.Hashable (class Hashable)
-import Data.Lens (Lens, lens)
-import Data.Maybe (Maybe, fromMaybe, maybe')
+import Data.Lens (Lens, Lens', lens)
+import Data.Maybe (Maybe(..), fromMaybe, maybe')
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\), type (/\))
 import Safe.Coerce (coerce)
@@ -46,6 +48,11 @@ insertMany from = flip $ foldr (insert from)
 delete :: forall key. Hashable key => key -> BiHashMap key -> BiHashMap key
 delete key = coerce (HashMap.delete key >>> map (HashSet.delete key))
 
+deleteConnection :: forall key. Hashable key => key -> key -> BiHashMap key -> BiHashMap key
+deleteConnection from to = coerce (removeFromSet from to >>> removeFromSet to from)
+    where
+    removeFromSet from to = HashMap.update (HashSet.delete to >>> Just) from
+
 empty :: forall t. BiHashMap t
 empty = BiHashMap HashMap.empty
 
@@ -61,10 +68,19 @@ connections = toHashMap >>> HashMap.toArrayBy connections >>> join >>> map order
 half :: forall key. Ord key => BiHashMap key -> Array key
 half = connections >>> map fst
 
+hasConnection :: forall key. Hashable key => key -> key -> BiHashMap key -> Boolean
+hasConnection from to = lookup from >>> HashSet.member to
+
 _atBiHashMap :: forall k. Hashable k => k -> Lens (BiHashMap k) (BiHashMap k) (HashSet k) (Maybe k)
 _atBiHashMap k =
     lens (lookup k) \m ->
       maybe' (\_ -> delete k m) \v -> insert k v m
+
+_atBiHashMapConnection :: forall k. Hashable k => k -> k -> Lens' (BiHashMap k) Boolean
+_atBiHashMapConnection from to =
+    lens (hasConnection from to) \whole isThere -> if isThere
+        then insert from to whole
+        else deleteConnection from to whole
 
 ---------- Typeclass instances
 instance (Debug d, Ord d, Hashable d) => Debug (BiHashMap d) where
