@@ -37,3 +37,9 @@ connectionWeight = 10.0
 
 hoveredConnectionWeight :: Number
 hoveredConnectionWeight = 17.0
+
+headBorderColor :: String
+headBorderColor = "#DEEE93"
+
+headBorderWeight :: Number
+headBorderWeight = 4.0

@@ -31,7 +31,7 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -165,6 +165,9 @@ scene =
                         , hoveredPin: state <#> preview (_hovered <<< ix 0 <<< _nestedPinDropZone)
                             # Aged.dropDuplicates
                             # Aged.dropDuplicatesOn _Just
+                        , isHead: state 
+                            <#> view _ruleHead <#> ((==) nodeId)
+                            # Aged.dropDuplicates
                         }
                     pure $ mapAction NodeAction geometry
                 bodyNodes

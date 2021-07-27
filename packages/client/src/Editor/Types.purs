@@ -104,6 +104,9 @@ _atRuleConnection from to = _rule <<< NodeGraph._ruleConnections <<< _atBiHashMa
 _ruleBody :: Lens' EditorState (Array NodeId)
 _ruleBody = _rule <<< NodeGraph._ruleBody
 
+_ruleHead :: Lens' EditorState NodeId
+_ruleHead = _rule <<< NodeGraph._ruleHead
+
 _ruleNodes :: Lens' EditorState (HashMap NodeId NodeGraph.Node)
 _ruleNodes = _rule <<< NodeGraph._ruleNodes
 

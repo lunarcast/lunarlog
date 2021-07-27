@@ -12,7 +12,7 @@ import Geometry.Shapes.Flex as Flex
 import Geometry.TextBaseline as TextBaseline
 import Geometry.Transform as Transform
 import Graphics.Canvas (Context2D)
-import Loglude.Editor.Settings (connectionPreviewWeight, halfItemSpacing, itemSpacing, patternBackground, patternFont, patternPadding, patternStrokeColor, patternTextColor, pinColor, pinRadius)
+import Loglude.Editor.Settings (connectionPreviewWeight, halfItemSpacing, headBorderColor, headBorderWeight, itemSpacing, patternBackground, patternFont, patternPadding, patternStrokeColor, patternTextColor, pinColor, pinRadius)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
@@ -25,6 +25,7 @@ type RenderPatternInput =
     , selection :: Stream.Discrete Selection
     , hoveredPin :: Stream.Discrete (Maybe PinId)
     , visualPattern :: Stream.Discrete VisualGraph.Pattern
+    , isHead :: Stream.Discrete Boolean
     , nodeId :: NodeId
     }
 
@@ -35,23 +36,36 @@ type RenderNestedPatternInput =
     , pattern :: NodeGraph.Pattern
     , offset :: Number
     , nodeId :: NodeId
+    , insideHead :: Boolean
     }
 
 ---------- Implementation
+wrapWhenHead :: Ask Context2D => Boolean -> Geometry EditorGeometryId PatternAction -> Geometry EditorGeometryId PatternAction 
+wrapWhenHead false shape = shape
+wrapWhenHead true target = Geometry.aabbPadding
+    { target
+    , amount: Geometry.equalPadding 4.0
+    , paddingModifiers:
+        { fill: headBorderColor }
+    }
+
 renderPattern :: Ask Context2D => RenderPatternInput -> Stream.Discrete (Geometry EditorGeometryId PatternAction)
-renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hoveredPin } = ado
+renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hoveredPin, isHead } = ado
     inner <- ado
         flex <- ado
             pattern <- pattern
-            selectionIsNode <- selection <#> (preview _selectedNode >>> maybe false ((/=) nodeId)) # Aged.dropDuplicates
             hoveredPin <- hoveredPin
-            in Flex.withMinimumSize $ renderPatternLayout 
+            isHead <- isHead
+            selectionIsNode <- selection <#> (preview _selectedNode >>> maybe false ((/=) nodeId)) # Aged.dropDuplicates
+
+            in wrapWhenHead isHead $ Flex.withMinimumSize $ renderPatternLayout 
                 { lookupPattern
                 , pattern
                 , offset: 0.0
                 , nodeId
                 , selectionIsNode
                 , hoveredPin
+                , insideHead: isHead
                 }
         isSelected <- selection <#> (preview _selectedNode >>> maybe false ((==) nodeId)) # Aged.dropDuplicates
         in Geometry.group 
@@ -67,7 +81,7 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hovere
         }
 
 renderPatternLayout :: Ask Context2D => RenderNestedPatternInput -> FlexLayout EditorGeometryId PatternAction
-renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeId, selectionIsNode, hoveredPin } = Flex.createFlexLayout
+renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeId, selectionIsNode, hoveredPin, insideHead } = Flex.createFlexLayout
     { flexAxis: Y
     , stretchChildren: true
     , wrap: \child -> Geometry.reporter
@@ -155,7 +169,20 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
             , wrap:  Geometry.lockBounds \target -> annotate (NodeGeometry nodeId) $ Geometry.group
                 { children: [ target ] <> dashedLines id target
                 }
-            , children: [ Flex.NotLayout $ pin id LeftPin $ -offset, Flex.NotLayout $ pin id RightPin 0.0 ]
+            , children: 
+                [ Flex.NotLayout $ pin 
+                    { pinId: id
+                    , side: LeftPin
+                    , extraOffset: -offset
+                    , insideHead
+                    }
+                , Flex.NotLayout $ pin
+                    { pinId: id
+                    , side: RightPin
+                    , extraOffset: 0.0
+                    , insideHead
+                    }
+                ]
             }  
         childId, Just (NodeGraph.PatternNode pattern) -> Flex.IsLayout
             $ Flex.wrapLayout withSpacing
@@ -166,6 +193,7 @@ renderPatternLayout { lookupPattern, pattern: { name, arguments }, offset, nodeI
                 , offset: offset + patternPadding
                 , selectionIsNode
                 , hoveredPin
+                , insideHead
                 }
         <#> mapLayoutChild (Geometry.mapAction (patternActionWithParent nodeId))
 
@@ -190,19 +218,22 @@ dashedPinConnector { patternWidth, y, xOffset, sign } = Geometry.line
     adjustedY = y + weight * sign / 2.0
     weight = connectionPreviewWeight
 
-pin :: Ask Context2D => PinId -> PinSide -> Number -> Geometry EditorGeometryId PatternAction
-pin id side extraOffset = pinCircle # Geometry.lockBounds \locked -> annotate (PinGeometry id side) $ Geometry.transform
-    { target: locked
-    , transform: Transform.translate (vec2 offset 0.0)
-    }
+pin :: Ask Context2D => { pinId :: PinId, side :: PinSide, extraOffset :: Number, insideHead :: Boolean } -> Geometry EditorGeometryId PatternAction
+pin { pinId, side, extraOffset, insideHead } = pinCircle # Geometry.lockBounds 
+    \locked -> annotate (PinGeometry pinId side) $ Geometry.transform
+        { target: locked
+        , transform: Transform.translate (vec2 offset 0.0)
+        }
     where
     pinCircle = withSpacing $ Geometry.circle
         { radius: pinRadius
         , position: zero
         , fill: pinColor 
-        , onMousedown: \event -> SelectPin event id []
+        , onMousedown: \event -> SelectPin event pinId []
         }
 
     offset = extraOffset + case side of
-        LeftPin -> -pinRadius - patternPadding
-        RightPin -> pinRadius
+        LeftPin -> -pinRadius - patternPadding - headOffset
+        RightPin -> pinRadius + headOffset
+
+    headOffset = if insideHead then headBorderWeight else 0.0
