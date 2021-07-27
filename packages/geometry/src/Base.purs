@@ -7,7 +7,6 @@ import Data.Array as Array
 import Data.HashMap as HashMap
 import Data.Lazy (Lazy)
 import Data.Lazy as Lazy
-import Data.Lens (traversed)
 import Data.MouseButton (MouseButtons)
 import Data.Undefined.NoProblem.Closed as Closed
 import Geoemtry.Data.AABB (AABBLike, AABB)
@@ -15,9 +14,10 @@ import Geoemtry.Data.AABB as AABB
 import Geometry.TextBaseline (TextBaseline)
 import Geometry.Transform (TransformMatrix, inverse, multiplyVector)
 import Geometry.Transform as Transform
-import Geometry.Vector (Vec2, distanceSquared)
+import Geometry.Vector (Vec2, distanceSquared, dotProduct, multiplyScalar)
 import Graphics.Canvas (Context2D)
 import Loglude as Opt
+import Loglude.Data.Tree as Tree
 import Math (pow)
 
 ---------- Types
@@ -58,10 +58,15 @@ data ClickCheck
 
 type Attributes = Type -> Type -> Row Type -> Row Type
 
+newtype UnknownActionGeometryF id action = UnknownActionGeometryF (Geometry id action)
+type UnknownActionGeometry id = Exists (UnknownActionGeometryF id)
+
 -- | Indexed metrics of the data a reporter reported
 type ReporterOutput id =
     { absoluteBounds :: HashMap id AABB
     , relativeBounds :: HashMap id AABB
+    , transforms :: HashMap id TransformMatrix
+    , geometries :: HashMap id (UnknownActionGeometry id)
     , idTree :: Tree id
     }
 
@@ -85,7 +90,8 @@ type GeometryAttributes id action r =
     , label :: Opt String
     | EventAttributes id action r )
 
-type MultiStepRenderer id action = Geometry id action /\ Array (ReporterOutput id -> Geometry id action)
+type LayeredGeometry id action = Int /\ Geometry id action
+type MultiStepRenderer id action = LayeredGeometry id action /\ Array (ReporterOutput id -> LayeredGeometry id action)
 
 ---------- Attribute types for individual shapes
 type RectAttributes :: Attributes
@@ -123,6 +129,8 @@ type ReporterAttributes f id action r =
     , target :: Geometry id action
     , reportAbsoluteBounds :: f Boolean
     , reportRelativeBounds :: f Boolean
+    , reportTransform :: f Boolean
+    , reportGeometry :: f Boolean
     | r )
 
 type LineAttributes :: Attributes
@@ -177,6 +185,8 @@ reporter = Closed.coerce >>> withDefaults >>> Reporter
         , id: incomplete.id
         , reportAbsoluteBounds: Opt.fromOpt false incomplete.reportAbsoluteBounds
         , reportRelativeBounds: Opt.fromOpt false incomplete.reportRelativeBounds
+        , reportTransform: Opt.fromOpt false incomplete.reportTransform
+        , reportGeometry: Opt.fromOpt false incomplete.reportGeometry
         }
 
 annotate :: forall id action. id -> Geometry id action -> Geometry id action
@@ -253,7 +263,16 @@ pointInside point (LockBounds { target }) = pointInside point target
 pointInside point shape@(Transform { target }) = pointInside projected target
     where
     projected = toLocalCoordinates shape point
-pointInside point (Line _) = false -- TODO: implement
+pointInside point (Line { from, to, weight }) = distanceSquared referencePoint point <= actualWeight `pow` 2.0
+    where
+    referencePoint
+        | length <= 0.0 = from
+        | otherwise = do
+            let relative = to - from
+            let product = clamp 0.0 1.0 $ dotProduct (point - from) relative / length
+            from + relative `multiplyScalar` product
+    length = distanceSquared from to
+    actualWeight = Opt.fromOpt 1.0 weight
 pointInside point shape = bounds shape # maybe false (AABB.pointInside point)
 
 -- TODO: find a way to cache the inverse
@@ -281,10 +300,58 @@ attributes (Transform attributes) _ f = f attributes
 attributes (None position) _ f = f $ (Closed.coerce {} :: Record (GeometryAttributes id action ()))
 attributes _ default _ = default
 
+-- | Collect analytics reported by all the reporter components inside a geometry
+report :: forall id action. Hashable id => Ask Context2D => Geometry id action -> ReporterOutput id
+report (Rect _) = emptyReporterOutput
+report (Circle _) = emptyReporterOutput
+report (Line _) = emptyReporterOutput
+report (Text _) = emptyReporterOutput
+report (None _) = emptyReporterOutput
+report (MapAction existential) = existential # runExists \(MapActionF { target }) -> report target
+report (LockBounds { target }) = report target
+report (Group attributes)
+    = attributes.children <#> report
+    # foldr mergeReporterOutputs emptyReporterOutput
+report (Transform attributes)
+    = over _absoluteBounds (HashMap.mapMaybe transformBounds) 
+    $ over _transforms (map transformTransform) 
+    $ report attributes.target
+    where
+    transformBounds :: AABB -> Maybe AABB
+    transformBounds = AABB.points >>> map (multiplyVector attributes.transform) >>> AABB.fromPoints
+
+    transformTransform :: TransformMatrix -> TransformMatrix
+    transformTransform = (<>) attributes.transform
+report (Reporter { target, id, reportAbsoluteBounds, reportRelativeBounds, reportTransform, reportGeometry }) =
+    case bounds target of
+        Nothing -> childReport { idTree = idTree }
+        Just bounds ->
+            { absoluteBounds:
+                childReport.absoluteBounds # applyWhen reportAbsoluteBounds (HashMap.insert id bounds)
+            , relativeBounds:
+                childReport.relativeBounds # applyWhen reportRelativeBounds (HashMap.insert id bounds)
+            , transforms: childReport.transforms # applyWhen reportTransform (HashMap.insert id Transform.identityMatrix)
+            , geometries: childReport.geometries # applyWhen reportGeometry (HashMap.insert id $ mkExists $ UnknownActionGeometryF target)
+            , idTree
+            }
+    where
+    applyWhen :: forall a. Boolean -> (a -> a) -> a -> a
+    applyWhen condition f input
+        | condition = f input
+        | otherwise = input
+
+    idTree :: Tree id
+    idTree = Tree.annotate id childReport.idTree
+
+    childReport :: ReporterOutput id
+    childReport = report target
+
 mergeReporterOutputs :: forall id. Hashable id => ReporterOutput id -> ReporterOutput id -> ReporterOutput id
 mergeReporterOutputs a b =
     { absoluteBounds: a.absoluteBounds `HashMap.union` b.absoluteBounds
     , relativeBounds: a.relativeBounds `HashMap.union` b.relativeBounds
+    , transforms: a.transforms `HashMap.union` b.transforms
+    , geometries: a.geometries `HashMap.union` b.geometries
     , idTree: a.idTree <|> b.idTree
     }
 
@@ -293,6 +360,8 @@ emptyReporterOutput :: forall id. ReporterOutput id
 emptyReporterOutput =
     { absoluteBounds: HashMap.empty
     , relativeBounds: HashMap.empty
+    , transforms: HashMap.empty
+    , geometries: HashMap.empty
     , idTree: empty
     }
 
@@ -308,6 +377,12 @@ _transform = prop (Proxy :: _ "transform")
 
 _target :: forall id action r. Lens' { target :: Geometry id action | r } (Geometry id action)
 _target = prop (Proxy :: _ "target")
+
+_absoluteBounds :: forall id. Lens' (ReporterOutput id) (HashMap id AABB)
+_absoluteBounds = prop (Proxy :: _ "absoluteBounds")
+
+_transforms :: forall id. Lens' (ReporterOutput id) (HashMap id TransformMatrix)
+_transforms = prop (Proxy :: _ "transforms")
 
 ---------- Foreign imports
 foreign import measureText :: Context2D -> Opt String -> String -> TextMetrics

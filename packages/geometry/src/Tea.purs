@@ -35,7 +35,7 @@ import Geoemtry.Data.AABB (AABB)
 import Geometry.Base (CanvasMouseEvent, Geometry, GeometryAttributes, ReporterOutput, MultiStepRenderer, attributes, children, emptyReporterOutput, pointInside, toLocalCoordinates)
 import Geometry.Base as Geometry
 import Geometry.Hovered (hovered)
-import Geometry.Render.Canvas (multiStepRender)
+import Geometry.Render.Canvas (multiStepRender, render)
 import Geometry.Vector (Vec2, x, y)
 import Graphics.Canvas (CanvasElement, Context2D, clearRect, setCanvasHeight, setCanvasWidth)
 import Loglude.Cancelable (Cancelable)
@@ -121,7 +121,7 @@ createMouseEvent ev =
 
 ---------- Helpers
 -- | Get a stack of stuff a position hovers over using the current indexed report
-currentlyHovered :: forall state action id. Hashable id => HashSet id -> Vec2 -> TeaM state id action (Array id) 
+currentlyHovered :: forall state action id. Ask Context2D => Hashable id => HashSet id -> Vec2 -> TeaM state id action (Array id) 
 currentlyHovered except position = currentReport <#> hovered except position
 
 runTea :: 
@@ -185,7 +185,7 @@ launchTea tea = do
     rawState <- liftEffect $ Ref.new tea.initialState
     state <- liftEffect Stream.create
     rerenders <- liftEffect Stream.notifier
-    renderer <- liftEffect $ Ref.new (Geometry.None zero /\ []) 
+    renderer <- liftEffect $ Ref.new ((0 /\ Geometry.None zero) /\ []) 
     geometry <- liftEffect $ Ref.new (Geometry.None zero)
 
     let 
@@ -219,7 +219,8 @@ launchTea tea = do
           Ref.read dirty >>= flip when do
             size <- RR.read windowSize
             clearRect ask { x: 0.0, y: 0.0, width: x size, height: y size }
-            Ref.read renderer >>= multiStepRender ask >>= \(thisGeometry /\ report) -> do
+            Ref.read renderer <#> multiStepRender >>= \(thisGeometry /\ report) -> do
+                render ask thisGeometry
                 Ref.write report indexedReport
                 Ref.write thisGeometry geometry
             Ref.write false dirty

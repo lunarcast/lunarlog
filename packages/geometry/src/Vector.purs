@@ -16,6 +16,8 @@ module Geometry.Vector
     , buildFromAxis
     , greaterThan
     , smallerThan
+    , multiplyScalar
+    , dotProduct
     , _insideVector
     , _x
     , _y
@@ -99,3 +101,5 @@ _otherAxis axis = _axis (other axis)
 ---------- Foreign stuff
 foreign import distance :: Vec2 -> Vec2 -> Number
 foreign import distanceSquared :: Vec2 -> Vec2 -> Number
+foreign import dotProduct :: Vec2 -> Vec2 -> Number
+foreign import multiplyScalar :: Vec2 -> Number -> Vec2
