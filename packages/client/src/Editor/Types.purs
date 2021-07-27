@@ -4,9 +4,9 @@ import Loglude
 
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
-import FRP.Stream as Stream
+import Data.Lens.Index (ix)
 import Geometry (Vec2, CanvasMouseEvent)
-import Loglude.Data.BiHashMap (_atBiHashMap)
+import Loglude.Data.BiHashMap (_atBiHashMap, _atBiHashMapConnection)
 import Loglude.Run.ExternalState (EXTERNAL_STATE, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
@@ -25,12 +25,14 @@ data EditorGeometryId
     = NodeGeometry NodeId
     | NestedPinDropZone PinId
     | PinGeometry PinId PinSide
+    | ConnectionGeometry PinId PinId
 
 data EditorAction
     = NodeAction PatternAction
     | RefreshSelection CanvasMouseEvent
     | MouseMove CanvasMouseEvent
     | MouseUp CanvasMouseEvent
+    | DeleteConnection PinId PinId
 
 data Selection
     = SelectedNode NodeId
@@ -44,7 +46,6 @@ type EditorState =
     , visualRule :: VisualGraph.Rule
     , selection :: Selection
     , hovered :: HoverTarget
-    , mouseMove :: Stream.Discrete MouseEvent
     , mousePosition :: Vec2
     , nextId :: Natural
     }
@@ -94,8 +95,11 @@ _rule = prop (Proxy :: _ "rule")
 _ruleConnections :: Lens' EditorState (BiHashMap PinId)
 _ruleConnections = _rule <<< NodeGraph._ruleConnections
 
-_atRuleConnection :: PinId -> Lens EditorState EditorState (HashSet PinId) (Maybe PinId)
-_atRuleConnection id = _rule <<< NodeGraph._ruleConnections <<< _atBiHashMap id
+_atRuleConnectionPair :: PinId -> Lens EditorState EditorState (HashSet PinId) (Maybe PinId)
+_atRuleConnectionPair id = _rule <<< NodeGraph._ruleConnections <<< _atBiHashMap id
+
+_atRuleConnection :: PinId -> PinId -> Lens' EditorState Boolean
+_atRuleConnection from to = _rule <<< NodeGraph._ruleConnections <<< _atBiHashMapConnection from to
 
 _ruleBody :: Lens' EditorState (Array NodeId)
 _ruleBody = _rule <<< NodeGraph._ruleBody
@@ -127,6 +131,14 @@ _mousePosition = prop (Proxy :: _ "mousePosition")
 _hovered :: Lens' EditorState HoverTarget
 _hovered = prop (Proxy :: _ "hovered")
 
+_connectionGeometry :: Prism' EditorGeometryId (PinId /\ PinId)
+_connectionGeometry = prism' (uncurry ConnectionGeometry) case _ of
+    ConnectionGeometry from to -> Just (from /\ to)
+    _ -> Nothing
+
+_hoveredConnection :: Traversal' EditorState (PinId /\ PinId)
+_hoveredConnection = _hovered <<< ix 0 <<< _connectionGeometry
+
 _nestedPinDropZone :: Prism' EditorGeometryId PinId
 _nestedPinDropZone = prism' NestedPinDropZone case _ of
     NestedPinDropZone id -> Just id
@@ -154,4 +166,5 @@ instance Hashable EditorGeometryId where
     hash = hash <<< case _ of
         NodeGeometry id -> Left $ Left id
         PinGeometry id side -> Left $ Right (id /\ side)
-        NestedPinDropZone id -> Right id
+        NestedPinDropZone id -> Right $ Left id
+        ConnectionGeometry from to -> Right $ Right (from /\ to)

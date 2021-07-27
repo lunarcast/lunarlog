@@ -11,6 +11,7 @@ import Data.HashMap as HashMap
 import Data.Lens.Index (ix)
 import Data.MouseButton (nothingPressed)
 import Data.Traversable (sequence)
+import Data.Undefined.NoProblem as Opt
 import Effect.Aff (launchAff_)
 import FRP.Stream as Stream
 import Geoemtry.Data.AABB as AABB
@@ -22,14 +23,15 @@ import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (dropPattern, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
+import Loglude.Editor.Actions (deleteConnection, dropPattern, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
 import Loglude.Editor.Components.Connection (connection)
+import Loglude.Editor.Settings (hoveredConnectionWeight)
 import Loglude.Run.ExternalState (assign, get, modifying, use)
 import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), PinSide(..), Selection(..), _hovered, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -79,7 +81,6 @@ scene =
         , rule: rule
         , selection: NoSelection
         , hovered: []
-        , mouseMove: empty
         , mousePosition: zero
         , nextId: intToNat 13
         }
@@ -121,6 +122,8 @@ scene =
             removeSelection = assign _selection NoSelection
         MouseUp event -> do
             handleAction $ RefreshSelection event
+        DeleteConnection from to -> do
+            deleteConnection from to
         MouseMove event -> do
             oldPosition <- get <#> view _mousePosition
             rememberMousePosition event
@@ -135,8 +138,12 @@ scene =
     render :: Stream.Discrete EditorState -> Stream.Discrete (MultiStepRenderer _ _)
     render state = ado
         step1 <- step1 state
-        step2 <- step2 state
-        in step1 /\ [step2]
+        step2 <- connections state
+        step3 <- connectionPreview state
+        in (1 /\ step1) /\ 
+            [ step2 >>> Tuple 0
+            , step3 >>> Tuple 2
+            ]
         
     step1 :: Stream.Discrete EditorState -> Stream.Discrete (Geometry _ _)
     step1 state = state 
@@ -187,15 +194,34 @@ connections ::
     Ask Context2D => 
     Stream.Discrete EditorState -> 
     Stream.Discrete (ReporterOutput EditorGeometryId -> Geometry EditorGeometryId EditorAction)
-connections state =state
-    <#> view _ruleConnections
-    # Aged.dropDuplicates
-    <#> BiHashMap.connections
-    <#> \connections report -> Geometry.group
+connections state = ado
+    connections <- state
+        <#> view _ruleConnections
+        # Aged.dropDuplicates
+        <#> BiHashMap.connections
+    hoveredConnection <- state
+        <#> preview _hoveredConnection
+        # Aged.dropDuplicatesOn _Just
+    in \report -> Geometry.group
         { children: connections <#> 
-            \(from /\ to) -> renderConnection 
-                (lookupBothPinSides report from) 
-                (lookupBothPinSides report to)
+            \(from /\ to) -> do
+                let isHoveredOver = hoveredConnection == Just (from /\ to)
+                let connectionWeight = if isHoveredOver then Opt.opt hoveredConnectionWeight else Opt.undefined
+                let connection = renderConnection
+                      connectionWeight
+                      (lookupBothPinSides report from) 
+                      (lookupBothPinSides report to)
+
+                Geometry.reporter 
+                    { id: ConnectionGeometry from to
+                    , reportAbsoluteBounds: true
+                    , reportTransform: true
+                    , reportGeometry: true
+                    , target: Geometry.group 
+                        { children: [connection]
+                        , onMousedown: const $ DeleteConnection from to
+                        }
+                    }
         }
 
 connectionPreview :: 
@@ -208,14 +234,14 @@ connectionPreview state = ado
         # Aged.dropDuplicatesOn _Just
     mousePosition <- state <#> view _mousePosition # Aged.dropDuplicates
     in \report -> renderConnection 
+        Opt.undefined
         (selectedPin >>= lookupBothPinSides report)
         (Just (mousePosition /\ mousePosition))
 
-
-renderConnection :: Maybe (Vec2 /\ Vec2) -> Maybe (Vec2 /\ Vec2) -> Geometry EditorGeometryId EditorAction
-renderConnection left right = 
+renderConnection :: Opt Number -> Maybe (Vec2 /\ Vec2) -> Maybe (Vec2 /\ Vec2) -> Geometry EditorGeometryId EditorAction
+renderConnection connectionWeight left right = 
         case start, lift3 pickSide right middleRight (map x start) of
-            Just from, Just to -> connection { from, to } 
+            Just from, Just to -> connection { from, to, connectionWeight } 
             _, _ -> Geometry.None zero
         where
         start = lift3 pickSide left middleLeft middleRight

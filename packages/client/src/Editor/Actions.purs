@@ -4,21 +4,20 @@ import Loglude
 
 import Data.Array as Array
 import Data.HashSet as HashSet
-import Data.Lens (traversed)
 import Data.Vec as Vec
-import Geometry (CanvasMouseEvent, _position)
+import Geometry (CanvasMouseEvent, Context2D, _position)
 import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
 import Loglude.Run.ExternalState (assign, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleConnection, _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
 
 ---------- Implementation
-updateHovered :: ClientM Unit
+updateHovered :: Ask Context2D => ClientM Unit
 updateHovered = do
     mousePosition <- use _mousePosition
     selection <- use _selection
@@ -43,7 +42,7 @@ selectPin :: PinId -> NodeId -> ClientM Unit
 selectPin pinId topmostNodeId = do
     use _selection >>= case _ of
         SelectedPin selected | selected /= pinId -> do
-            assign (_atRuleConnection selected) $ Just pinId
+            assign (_atRuleConnectionPair selected) $ Just pinId
             assign _selection NoSelection
         _ -> do
             assign _selection $ SelectedPin pinId
@@ -53,12 +52,13 @@ selectPin pinId topmostNodeId = do
 deletePin :: PinId /\ NodeId -> ClientM Unit
 deletePin (pinId /\ pinNodeId) = do
     assign (_atRuleNode pinNodeId) Nothing
+    assign (_atRuleConnectionPair pinId) Nothing
 
 dropPattern :: NodeId -> ClientM Unit
 dropPattern nodeId = do
     use _hovered >>= case _ of
         stack | [NestedPinDropZone id, NodeGeometry pinNodeId, NodeGeometry parent] <- Array.take 3 stack -> do
-            -- deletePin pinNodeId
+            deletePin (id /\ pinNodeId)
 
             -- Place dropped node inside the parent of the pin
             modifying (_ruleNode parent <<< NodeGraph._patternNode <<< NodeGraph._patternArguments) $ 
@@ -76,6 +76,11 @@ dropPattern nodeId = do
 -- | Update the last mouse position in the state
 rememberMousePosition :: CanvasMouseEvent -> ClientM Unit
 rememberMousePosition event = assign _mousePosition $ event.worldPosition
+
+-- | Run when the user clicks on a connection
+deleteConnection :: PinId -> PinId -> ClientM Unit
+deleteConnection from to = do
+    assign (_atRuleConnection from to) false
 
 -- | Respond to a user clicking on a nested node
 selectNestedNode :: { parent :: NodeId, nodeId :: NodeId } -> ClientM Unit

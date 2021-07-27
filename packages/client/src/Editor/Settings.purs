@@ -34,3 +34,6 @@ connectionPreviewWeight = 4.0
 
 connectionWeight :: Number
 connectionWeight = 10.0
+
+hoveredConnectionWeight :: Number
+hoveredConnectionWeight = 17.0
