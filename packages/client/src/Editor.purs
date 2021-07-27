@@ -165,8 +165,8 @@ scene =
                         , hoveredPin: state <#> preview (_hovered <<< ix 0 <<< _nestedPinDropZone)
                             # Aged.dropDuplicates
                             # Aged.dropDuplicatesOn _Just
-                        , isHead: state 
-                            <#> view _ruleHead <#> ((==) nodeId)
+                        , headId: state 
+                            <#> view _ruleHead
                             # Aged.dropDuplicates
                         }
                     pure $ mapAction NodeAction geometry

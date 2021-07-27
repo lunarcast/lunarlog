@@ -11,7 +11,7 @@ import Loglude.Run.ExternalState (assign, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleHead, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -56,7 +56,8 @@ deletePin (pinId /\ pinNodeId) = do
 
 dropPattern :: NodeId -> ClientM Unit
 dropPattern nodeId = do
-    use _hovered >>= case _ of
+    headNode <- use _ruleHead
+    unless (nodeId == headNode) $ use _hovered >>= case _ of
         stack | [NestedPinDropZone id, NodeGeometry pinNodeId, NodeGeometry parent] <- Array.take 3 stack -> do
             deletePin (id /\ pinNodeId)
 

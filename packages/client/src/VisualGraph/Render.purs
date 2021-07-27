@@ -25,7 +25,7 @@ type RenderPatternInput =
     , selection :: Stream.Discrete Selection
     , hoveredPin :: Stream.Discrete (Maybe PinId)
     , visualPattern :: Stream.Discrete VisualGraph.Pattern
-    , isHead :: Stream.Discrete Boolean
+    , headId :: Stream.Discrete NodeId
     , nodeId :: NodeId
     }
 
@@ -50,15 +50,17 @@ wrapWhenHead true target = Geometry.aabbPadding
     }
 
 renderPattern :: Ask Context2D => RenderPatternInput -> Stream.Discrete (Geometry EditorGeometryId PatternAction)
-renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hoveredPin, isHead } = ado
+renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hoveredPin, headId } = ado
     inner <- ado
+        isHead <- headId <#> ((==) nodeId) # Aged.dropDuplicates
         flex <- ado
             pattern <- pattern
             hoveredPin <- hoveredPin
-            isHead <- isHead
-            selectionIsNode <- selection <#> (preview _selectedNode >>> maybe false ((/=) nodeId)) # Aged.dropDuplicates
+            selectionIsNode <- Stream.do
+                headId <- headId
+                selection <#> (preview _selectedNode >>> maybe false ((/=) nodeId && (/=) headId)) # Aged.dropDuplicates
 
-            in wrapWhenHead isHead $ Flex.withMinimumSize $ renderPatternLayout 
+            in \isHead -> wrapWhenHead isHead $ Flex.withMinimumSize $ renderPatternLayout 
                 { lookupPattern
                 , pattern
                 , offset: 0.0
@@ -69,8 +71,8 @@ renderPattern { lookupPattern, pattern, visualPattern, nodeId, selection, hovere
                 }
         isSelected <- selection <#> (preview _selectedNode >>> maybe false ((==) nodeId)) # Aged.dropDuplicates
         in Geometry.group 
-            { children: [ flex ]
-            , alpha: if not isSelected then 1.0 else 0.7
+            { children: [ flex isHead ]
+            , alpha: if not isSelected || isHead then 1.0 else 0.7
             }
 
     position <- visualPattern <#> _.position
