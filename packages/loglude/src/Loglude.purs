@@ -11,6 +11,7 @@ module Loglude
     , module Loglude.Data.Tree
     , module Loglude.Data.Debug
     , module Loglude.MutableRecord  
+    , module Loglude.Data.BiHashMap
     , module Data.Vec
     , module Data.Typelevel.Num
     , module Data.Undefined.NoProblem
@@ -68,6 +69,7 @@ module Loglude
 
 import Prelude
 
+import Loglude.Data.BiHashMap (BiHashMap)
 import Control.Monad.Rec.Class (Step(..), tailRec)
 import Control.Plus ((<|>), class Alt, class Plus, alt, empty)
 import Data.Array.NonEmpty (NonEmptyArray)

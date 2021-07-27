@@ -19,7 +19,7 @@ logPretty :: forall d. Debug d => d -> Effect Unit
 logPretty = showPretty >>> log
 
 -- | A debug instance which shows more context.
--- | At repl, call `:print Lunarflow.Debug.myDebug`
+-- | At repl, call `:print Loglude.Data.Debug.myDebug`
 myDebug :: forall d. Debug d => d -> Effect Unit
 myDebug = Console.log <<< showPretty
 
