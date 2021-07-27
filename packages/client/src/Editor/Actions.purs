@@ -54,6 +54,22 @@ deletePin (pinId /\ pinNodeId) = do
     assign (_atRuleNode pinNodeId) Nothing
     assign (_atRuleConnectionPair pinId) Nothing
 
+-- | Remove all data about a node from the state. 
+-- | Does nothing on head nodes
+deleteNode :: NodeId -> ClientM Boolean
+deleteNode nodeId = do
+    headNode <- use _ruleHead
+    if nodeId /= headNode then do
+        use (_atRuleNode nodeId) >>= traverse_ case _ of
+            NodeGraph.Unify pinId -> deletePin (pinId /\ nodeId)
+            NodeGraph.PatternNode { arguments } -> for_ arguments deleteNode
+        assign (_atRuleNode nodeId) Nothing
+        assign (_atVisualRuleNode nodeId) Nothing
+        modifying _ruleBody $ Array.delete nodeId
+        pure true
+    else
+        pure false
+
 dropPattern :: NodeId -> ClientM Unit
 dropPattern nodeId = do
     headNode <- use _ruleHead

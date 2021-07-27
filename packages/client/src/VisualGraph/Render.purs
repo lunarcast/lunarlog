@@ -232,6 +232,7 @@ pin { pinId, side, extraOffset, insideHead } = pinCircle # Geometry.lockBounds
         , position: zero
         , fill: pinColor 
         , onMousedown: \event -> SelectPin event pinId []
+        , alpha: 1.0
         }
 
     offset = extraOffset + case side of

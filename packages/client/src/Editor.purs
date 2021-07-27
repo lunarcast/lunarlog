@@ -23,7 +23,7 @@ import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (deleteConnection, dropPattern, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
+import Loglude.Editor.Actions (deleteConnection, deleteNode, dropPattern, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
 import Loglude.Editor.Components.Connection (connection)
 import Loglude.Editor.Settings (hoveredConnectionWeight)
 import Loglude.Run.ExternalState (assign, get, modifying, use)
@@ -31,7 +31,10 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Prelude (when)
+import Web.Event.Event (EventType(..))
+import Web.UIEvent.KeyboardEvent as KeyboardEvent
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
@@ -92,9 +95,20 @@ scene =
     setup { propagateAction } = do
         Cancelable.subscribe (eventStream MouseEvent.fromEvent EventTypes.mousemove) $ (createMouseEvent >>> MouseMove >>> propagateAction >>> launchAff_)
         Cancelable.subscribe (eventStream MouseEvent.fromEvent EventTypes.mouseup) $ (createMouseEvent >>> MouseUp >>> propagateAction >>> launchAff_)
+        Cancelable.subscribe (eventStream KeyboardEvent.fromEvent (EventType "keypress")) \keyEvent -> case KeyboardEvent.key keyEvent of
+            "Delete" -> launchAff_ $ propagateAction (KeyboardAction DeleteKey)
+            _ -> pure unit
+
 
     handleAction :: EditorAction -> TeaM EditorState EditorGeometryId EditorAction Unit
     handleAction = case _ of
+        KeyboardAction DeleteKey -> do
+            use _selection >>= case _ of
+                SelectedNode id -> do
+                    success <- deleteNode id
+                    when success do
+                        assign _selection NoSelection
+                _ -> pure unit
         NodeAction (SelectNode event path) -> do
             rememberMousePosition event
             let nodeId = NonEmptyArray.head path

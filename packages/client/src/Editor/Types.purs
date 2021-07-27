@@ -27,12 +27,17 @@ data EditorGeometryId
     | PinGeometry PinId PinSide
     | ConnectionGeometry PinId PinId
 
+data KeyboardAction
+    = DeleteKey
+
+-- | All the possibe actions which can be triggered during the lifetime of an editor
 data EditorAction
     = NodeAction PatternAction
     | RefreshSelection CanvasMouseEvent
     | MouseMove CanvasMouseEvent
     | MouseUp CanvasMouseEvent
     | DeleteConnection PinId PinId
+    | KeyboardAction KeyboardAction
 
 data Selection
     = SelectedNode NodeId
