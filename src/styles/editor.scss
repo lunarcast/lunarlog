@@ -1,15 +1,17 @@
+@use "sass:math";
 @import "./theme.scss";
 @import url("https://fonts.googleapis.com/css2?family=Ubuntu:wght@300&display=swap");
 
 #editor {
   height: 100vh;
-  overflow-y: hidden;
+  width: 100vw;
+  overflow: hidden;
 
   padding: $spacing;
   box-sizing: border-box;
 
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 33% 33% 33%;
   grid-template-rows: 50% 50%;
 }
 
@@ -52,6 +54,7 @@
 
   backdrop-filter: grayscale(0.4) blur(0.3rem);
 }
+
 #editor
   > .editor__pane
   > .editor__pane-disabled-overlay
@@ -141,6 +144,29 @@
   .button {
     cursor: pointer;
   }
+}
+
+.rule {
+  @include dropShadow();
+  padding: $spacing;
+  margin: math.div($spacing, 3);
+}
+
+.rule > .rule__name {
+  font-size: 1.1rem;
+}
+
+$ruleBranchRowHeight: 100px;
+
+.rule > .rule__branches {
+  height: $ruleBranchRowHeight;
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+}
+
+.rule > .rule__branches > .rule_branch > img {
+  height: $ruleBranchRowHeight;
 }
 
 // ========== Media queries
