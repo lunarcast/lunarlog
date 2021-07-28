@@ -282,6 +282,8 @@ export const EditorUi = (props: EditorProps) => {
         });
       });
 
+      setCurrentBranch([name, rules[name].branches.length]);
+
       if (!initializedPurescript) {
         props.initializeEditor(name, nodes[name]);
         setInitializedPurescript(true);
@@ -309,13 +311,19 @@ export const EditorUi = (props: EditorProps) => {
     });
   }, []);
 
-  const toggleEditor = useCallback(() => {
-    toggleHidden();
-  }, []);
+  useKey(
+    "s",
+    () => {
+      if (currentBranch === null) return;
+      toggleHidden();
+    },
+    {
+      target: window,
+    },
+    [currentBranch]
+  );
 
-  useKey("s", toggleEditor, {
-    target: window,
-  });
+  console.log({ currentBranch });
 
   return (
     <div id="editor" class={isHidden ? "editor__hidden" : ""}>

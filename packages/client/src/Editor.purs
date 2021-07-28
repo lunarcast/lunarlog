@@ -31,7 +31,7 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, InitialState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), PatternShape, _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, InitialState, KeyboardAction(..), PatternAction(..), PatternShape, PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Prelude (const, when, zero)
 import Web.Event.Event (EventType(..))
 import Web.UIEvent.KeyboardEvent as KeyboardEvent
@@ -100,6 +100,7 @@ scene initial =
 
     handleAction :: EditorAction -> TeaM EditorState EditorGeometryId EditorAction Unit
     handleAction = case _ of
+        ForeignAction _ -> pure unit
         KeyboardAction DeleteKey -> do
             use _selection >>= case _ of
                 SelectedNode id -> do

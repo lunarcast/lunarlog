@@ -44,6 +44,7 @@ data EditorAction
     | MouseUp CanvasMouseEvent
     | DeleteConnection PinId PinId
     | KeyboardAction KeyboardAction
+    | ForeignAction ForeignAction
 
 data Selection
     = SelectedNode NodeId
