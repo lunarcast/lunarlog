@@ -1,7 +1,9 @@
-module FRP.Stream (module FRP.Event, Discrete, Notifier, bind, discard, effectfulMap, inspect, notify, notifier) where
+module FRP.Stream (module FRP.Event, Discrete, Notifier, bind, discard, effectfulMap, inspect, notify, notifier, previewMap) where
 
 import Prelude hiding (discard, bind)
 
+import Data.Lens (Fold, preview)
+import Data.Maybe.First (First)
 import Effect (Effect)
 import FRP.Event (class Filterable, class IsEvent, Event, EventIO, count, create, filterMap, fix, fold, folded, gate, gateBy, keepLatest, makeEvent, mapAccum, sampleOn, sampleOn_, subscribe, withLast)
 
@@ -26,6 +28,10 @@ notify e = e.push unit
 -- | Create a notifier
 notifier :: Effect Notifier
 notifier = create
+
+-- | Run an optic over a stream
+previewMap :: forall f s t a b. Filterable f => Fold (First a) s t a b -> f s -> f a
+previewMap getter = filterMap (preview getter)
 
 ---------- Types
 type Discrete = Event

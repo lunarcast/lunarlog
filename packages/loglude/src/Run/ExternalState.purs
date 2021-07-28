@@ -9,6 +9,7 @@ module Loglude.Run.ExternalState
     , modifying
     , assign
     , use
+    , preuse
     , runStateEffectfully
     , runStateUsingReactiveRef
     , runStateUsingRef
@@ -17,7 +18,9 @@ module Loglude.Run.ExternalState
 
 import Loglude hiding (set)
 
+import Data.Lens (Fold)
 import Data.Lens as Lens
+import Data.Maybe.First (First)
 import Effect.Ref as Ref
 import Loglude.ReactiveRef as RR
 import Run (liftAff)
@@ -82,6 +85,9 @@ assign lens v = modify_ (Lens.set lens v)
 
 use :: forall s t a b r. Getter s t a b -> Run (EXTERNAL_STATE s r) a
 use lens = gets $ Lens.view lens
+
+preuse :: forall s t a b r. Fold (First a) s t a b -> Run (EXTERNAL_STATE s r) (Maybe a)
+preuse lens = gets $ Lens.preview lens
 
 ---------- SProxies
 _externalState :: Proxy "externalState"
