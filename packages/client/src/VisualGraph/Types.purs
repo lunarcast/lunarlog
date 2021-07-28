@@ -3,7 +3,7 @@ module Lunarlog.Client.VisualGraph.Types where
 import Loglude
 
 import Geometry.Vector (Vec2)
-import Lunarlog.Core.NodeGraph (NodeId, PinId)
+import Lunarlog.Core.NodeGraph (NodeId)
 
 ---------- Types
 type Pattern =
@@ -15,7 +15,6 @@ data Node
 
 type Rule =
     { nodes :: HashMap NodeId Node
-    , connections :: HashMap PinId PinId
     }
 
 ---------- Lenses

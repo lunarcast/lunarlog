@@ -43,9 +43,7 @@ data Declaration
     = RuleDeclaration (Array Rule)
     | AdtDeclaration AdtDeclaration
 
-type Module =
-    { name :: Array String
-    , declarations :: Array Declaration }
+type Module = HashMap String (Array Rule)
 
 ---------- Lenses
 _ruleNodes :: Lens' Rule (HashMap NodeId Node)

@@ -6,6 +6,7 @@
   "devDependencies": {
     "@types/node": "^16.4.3",
     "esbuild": "^0.12.9",
+    "esbuild-plugin-alias": "^0.1.2",
     "esbuild-plugin-purescript": "^1.0.2",
     "esbuild-sass-plugin": "^1.4.7",
     "live-server": "^1.2.1",
@@ -19,6 +20,10 @@
     "@thi.ng/hiccup-canvas": "^1.2.5",
     "@thi.ng/matrices": "^0.6.59",
     "@thi.ng/vectors": "^6.0.1",
-    "preact": "^10.5.14"
+    "immer": "^9.0.5",
+    "preact": "^10.5.14",
+    "react-use": "^17.2.4",
+    "ts-adt": "^2.1.2",
+    "use-immer": "^0.6.0"
   }
 }

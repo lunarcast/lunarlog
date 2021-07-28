@@ -9,6 +9,14 @@
   left: 0;
 
   position: absolute;
+  background: transparent;
+}
+
+.app__layer#canvas {
+  background: $very-dark;
+}
+
+#app > .app__layer > * {
   background: $very-dark;
 }
 

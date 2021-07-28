@@ -15,6 +15,10 @@
   grid-template-rows: 50% 50%;
 }
 
+#editor.editor__hidden {
+  display: none;
+}
+
 #editor > .editor__pane {
   position: relative;
   order: 1;

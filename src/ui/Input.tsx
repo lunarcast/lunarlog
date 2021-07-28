@@ -21,8 +21,6 @@ interface ButtonProps {
 export const Input = <T extends keyof InputTypes = "text">(
   props: InputProps<T>
 ) => {
-  console.log(props.value);
-
   return (
     <div className="input">
       <span className="input__label" for={props.id}>

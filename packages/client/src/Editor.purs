@@ -31,61 +31,59 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
-import Prelude (when)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, InitialState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), PatternShape, _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Prelude (const, when, zero)
 import Web.Event.Event (EventType(..))
 import Web.UIEvent.KeyboardEvent as KeyboardEvent
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
 ---------- Constants
-rule :: NodeGraph.Rule
-rule = NodeGraph.Rule
-    { head: NodeId 0
-    , body: [NodeId 0, NodeId 6]
-    , nodes: HashMap.fromArray $ mkNodes "Exmaple pattern" 0 <> mkNodes "Super duper mega long name" 6
+emptyRule :: { name :: String, argumentCount :: Int } -> Int -> Int /\ NodeGraph.Rule
+emptyRule { name, argumentCount } startingId = nextId /\
+    NodeGraph.Rule
+    { head: NodeId startingId
+    , body: [NodeId startingId]
+    , nodes: HashMap.fromArray $ Array.cons (NodeId startingId /\ node) pins 
     , connections: BiHashMap.empty
     }
     where
-    mkNodes name id = 
-        [ NodeId id /\ NodeGraph.PatternNode
-            { name
-            , arguments: NodeId <$> [id + 1, id + 2, id + 3]
-            }
-        , NodeId (id + 1) /\ NodeGraph.Unify (NodeGraph.PinId id)
-        , NodeId (id + 2) /\ NodeGraph.Unify (NodeGraph.PinId $ id + 1)
-        , NodeId (id + 3) /\ NodeGraph.PatternNode
-            { name: "Tuple"
-            , arguments:  NodeId <$> [id + 4, id + 5]
-            }
-        , NodeId (id + 4) /\ NodeGraph.PatternNode
-            { name: "Zero"
-            , arguments: []
-            }
-        , NodeId (id + 5) /\ NodeGraph.Unify (NodeGraph.PinId $ id + 2)
-        ] 
+    node = NodeGraph.PatternNode
+        { name
+        , arguments: indices <#> \index-> NodeId (startingId + index)
+        }
 
-myVisualPattern :: VisualGraph.Rule
-myVisualPattern = do
-    let node1 = { position: vec2 100.0 200.0 }
-    let node2 = { position: vec2 400.0 200.0 }
-    { connections: HashMap.empty
-    , nodes: HashMap.fromArray
-        [ NodeId 0 /\ VisualGraph.PatternNode node1
-        , NodeId 6 /\ VisualGraph.PatternNode node2
+    pins = indices <#> \index -> NodeId (startingId + index) /\ NodeGraph.Unify (NodeGraph.PinId index)
+
+    nextId = startingId + argumentCount + 1
+    indices = Array.replicate argumentCount unit # Array.mapWithIndex (((+) 1) >>> const)
+
+emptyVisualGraph :: Natural -> VisualGraph.Rule
+emptyVisualGraph id =
+    { nodes: HashMap.fromArray
+        [ NodeId (natToInt id) /\ VisualGraph.PatternNode { position: vec2 200.0 200.0 }
         ]
     }
 
 ---------- Implementation
-scene :: Ask Context2D => Tea EditorState EditorGeometryId EditorAction
-scene =
+initialState :: PatternShape -> InitialState
+initialState { name, argumentCount } =
+    { rule
+    , nextId: intToNat nextId
+    }
+    where
+    nextId /\ rule = emptyRule { name, argumentCount } 0
+
+scene :: Ask Context2D => InitialState -> Tea EditorState EditorGeometryId EditorAction
+scene initial =
     { initialState: 
-        { visualRule: myVisualPattern
-        , rule: rule
+        { visualRule: emptyVisualGraph zero
+        , remainingModule: HashMap.empty
         , selection: NoSelection
         , hovered: []
         , mousePosition: zero
-        , nextId: intToNat 13
+        , rule: initial.rule
+        , nextId: initial.nextId
         }
     , render
     , handleAction

@@ -30,6 +30,12 @@ data EditorGeometryId
 data KeyboardAction
     = DeleteKey
 
+-- | An action introduced by the typescript side
+data ForeignAction
+    = CreateBranch String Int
+    | EditBranch String Int
+    | CreateRule String
+
 -- | All the possibe actions which can be triggered during the lifetime of an editor
 data EditorAction
     = NodeAction PatternAction
@@ -46,8 +52,19 @@ data Selection
 
 type HoverTarget = Array EditorGeometryId
 
-type EditorState = 
+type PatternShape =
+    { argumentCount :: Int
+    , name :: String
+    }
+
+type InitialState =
     { rule :: NodeGraph.Rule
+    , nextId :: Natural
+    }
+
+type EditorState = 
+    { remainingModule :: NodeGraph.Module
+    , rule :: NodeGraph.Rule
     , visualRule :: VisualGraph.Rule
     , selection :: Selection
     , hovered :: HoverTarget

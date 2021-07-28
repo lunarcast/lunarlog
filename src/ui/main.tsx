@@ -1,10 +1,14 @@
 import "../styles/editor.scss";
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useCallback } from "preact/hooks";
 import { Button, Input } from "./Input";
 import { ComponentChild } from "preact";
 import { Spacing } from "./Spacing";
 import { capitalize, capitalizeWord } from "./helpers";
-import { div } from "@thi.ng/vectors";
+import { ForeignAction, ForeignThumbail } from "../foreign";
+import { Stream } from "../Stream";
+import { useImmer } from "use-immer";
+import { useKey, useBoolean } from "react-use";
+import { Icon } from "./Icon";
 
 // ========== Types
 interface RuleBranch {
@@ -37,6 +41,7 @@ interface NodeProps {
 interface RuleListProps {
   rules: RuleMemory;
   disabled?: boolean;
+  createBranch(name: string): void;
 }
 
 interface RuleBranchProps {
@@ -47,14 +52,21 @@ interface RuleBranchProps {
 interface BranchListProps {
   branches: Array<RuleBranch>;
   name: string;
+  createBranch(): void;
 }
 
 interface CreateCompoundProps {
   isTaken(name: string): boolean;
-  createNode(name: string, argumentCount: number): void;
+  create(name: string, argumentCount: number): void;
   productName: string;
   allowUpdates?: boolean;
   disabled?: boolean;
+}
+
+interface EditorProps {
+  emit(action: ForeignAction): void;
+  thumails: Stream<ForeignThumbail>;
+  initializeEditor(name: string, argumentCount: number): void;
 }
 
 // ========== Constants
@@ -143,11 +155,14 @@ const RuleBranch = ({ thumbail, name }: RuleBranchProps) => {
 };
 
 // The rule list panel
-const BranchList = ({ branches, name }: BranchListProps) => {
+const BranchList = ({ branches, name, createBranch }: BranchListProps) => {
   return (
     <div className="rule">
       <div className="rule__name">{capitalizeWord(name)}</div>
       <div className="rule__branches">
+        <button className="rule__create-branch" onClick={createBranch}>
+          <Icon>add</Icon>
+        </button>
         {branches.map(({ thumbail }, index) => (
           <RuleBranch name={name} thumbail={thumbail} key={index} />
         ))}
@@ -156,14 +171,19 @@ const BranchList = ({ branches, name }: BranchListProps) => {
   );
 };
 
-const RuleList = ({ rules, disabled }: RuleListProps) => {
+const RuleList = ({ rules, disabled, createBranch }: RuleListProps) => {
   return (
     <EditorPane
       title="Rules"
       disabled={disabled ? "No rules found" : undefined}
     >
       {Object.entries(rules).map(([name, branches]) => (
-        <BranchList name={name} key={name} branches={branches.branches} />
+        <BranchList
+          createBranch={() => createBranch(name)}
+          name={name}
+          key={name}
+          branches={branches.branches}
+        />
       ))}
     </EditorPane>
   );
@@ -172,7 +192,7 @@ const RuleList = ({ rules, disabled }: RuleListProps) => {
 // Used for the create node and create rule components
 const CreateCompound = ({
   isTaken,
-  createNode,
+  create: createNode,
   productName,
   allowUpdates,
   disabled,
@@ -241,43 +261,85 @@ const CreateCompound = ({
   );
 };
 
-export const EditorUi = () => {
-  const [nodeMemory, setNodeMemory] = useState<NodeMemory>({});
-  const [rules, setRules] = useState<RuleMemory>({
-    myRule: {
-      branches: [
-        {
-          thumbail:
-            "https://images-na.ssl-images-amazon.com/images/I/41g6jROgo0L.png",
-        },
-        {
-          thumbail:
-            "https://images-na.ssl-images-amazon.com/images/I/41g6jROgo0L.png",
-        },
-      ],
+export const EditorUi = (props: EditorProps) => {
+  const [initializedPurescript, setInitializedPurescript] = useState(false);
+  const [currentBranch, setCurrentBranch] = useState<null | [string, number]>(
+    null
+  );
+
+  const [nodes, setNodes] = useImmer<NodeMemory>({});
+  const [rules, setRules] = useImmer<RuleMemory>({});
+
+  const [isHidden, toggleHidden] = useBoolean(false);
+
+  const createBranch = useCallback(
+    (name: string) => {
+      if (!Reflect.has(rules, name)) return;
+
+      setRules((draft: RuleMemory) => {
+        draft[name].branches.push({
+          thumbail: "",
+        });
+      });
+
+      if (!initializedPurescript) {
+        props.initializeEditor(name, nodes[name]);
+        setInitializedPurescript(true);
+      }
     },
+    [rules]
+  );
+
+  const createRule = useCallback((name: string, argumentCount: number) => {
+    setRules((draft: RuleMemory) => {
+      draft[name] = { branches: [] };
+    });
+
+    createNode(name, argumentCount);
+
+    props.emit({
+      _type: "createRule",
+      name,
+    });
+  }, []);
+
+  const createNode = useCallback((name: string, argumentCount: number) => {
+    setNodes((draft: NodeMemory) => {
+      draft[name] = argumentCount;
+    });
+  }, []);
+
+  const toggleEditor = useCallback(() => {
+    toggleHidden();
+  }, []);
+
+  useKey("s", toggleEditor, {
+    target: window,
   });
 
   return (
-    <div id="editor">
+    <div id="editor" class={isHidden ? "editor__hidden" : ""}>
       <CreateCompound
         productName={"rule"}
-        isTaken={(name) => Reflect.has(nodeMemory, name)}
-        createNode={(name, argumentCount) =>
-          setRules((old) => ({ ...old, [name]: { branches: [] } }))
-        }
+        isTaken={(name) => Reflect.has(nodes, name)}
+        create={createRule}
       />
-      <RuleList disabled={Object.entries(rules).length === 0} rules={rules} />
+      <RuleList
+        createBranch={createBranch}
+        disabled={Object.entries(rules).length === 0}
+        rules={rules}
+      />
       <CreateCompound
-        disabled
+        disabled={currentBranch === null}
         allowUpdates
         productName="node"
-        isTaken={(name) => Reflect.has(nodeMemory, name)}
-        createNode={(name, argumentCount) =>
-          setNodeMemory((old) => ({ ...old, [name]: argumentCount }))
-        }
+        isTaken={(name) => Reflect.has(nodes, name)}
+        create={createNode}
       />
-      <NodeList disabled nodes={[...Object.entries(nodeMemory)]} />
+      <NodeList
+        disabled={currentBranch === null}
+        nodes={[...Object.entries(nodes)]}
+      />
       <div className="editor__pane">7</div>
       <div className="editor__pane">8</div>
     </div>
