@@ -1,30 +1,23 @@
+import { renderPatternToImage } from "../foreign";
 import "../styles/editor.scss";
 import { Icon } from "./Icon";
 import { TabProps, Tabs, TabsProps } from "./Tabs";
+import { useEffect, useState } from "preact/hooks";
 
-interface NavigationLinkProps {
-  children: string;
-  activeTab: string;
-  icon: string;
-}
+const Nodes = () => {
+  const [nodeImage, setNodeImage] = useState("");
+  useEffect(() => {
+    renderPatternToImage("Long name:)", 4).then(setNodeImage);
+  }, []);
 
-export const NavigationLink = ({
-  children: name,
-  activeTab,
-  icon,
-}: NavigationLinkProps) => {
-  return (
-    <div className="editor__navigation-link-container">
-      <div className="editor__navigation-link-icon">
-        <Icon>{icon}</Icon>
-      </div>
-      <div className="editor__navigation-link">{name}</div>
-    </div>
-  );
+  return <img src={nodeImage} />;
 };
 
 const tabs: Array<TabProps> = [
-  { name: "Nodes", content: "Hello world" },
+  {
+    name: "Nodes",
+    content: <Nodes />,
+  },
   { name: "Rules", content: "Hello world rules" },
   {
     name: "Query",
