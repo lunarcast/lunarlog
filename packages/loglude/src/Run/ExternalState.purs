@@ -3,6 +3,7 @@ module Loglude.Run.ExternalState
     , EXTERNAL_STATE
     , get
     , set
+    , put
     , modify
     , modify_
     , gets
@@ -14,6 +15,8 @@ module Loglude.Run.ExternalState
     , runStateUsingReactiveRef
     , runStateUsingRef
     , runStateUsingReactiveRefAsync
+    , runFocused
+    , runPure
     ) where
 
 import Loglude hiding (set)
@@ -25,6 +28,7 @@ import Effect.Ref as Ref
 import Loglude.ReactiveRef as RR
 import Run (liftAff)
 import Run as Run
+import Run.State as State
 
 ---------- Types
 data ExternalState s a
@@ -42,6 +46,9 @@ get = Run.lift _externalState $ Get identity
 
 set :: forall r s. s -> Run (EXTERNAL_STATE s r) Unit
 set s = Run.lift _externalState $ Put s unit
+
+put :: forall r s. s -> Run (EXTERNAL_STATE s r) Unit
+put = set 
 
 ---------- Interpreters
 runStateEffectfully :: forall s r. Effect s -> (s -> Effect Unit) -> Run (EXTERNAL_STATE s + EFFECT r) ~> Run (EFFECT r)
@@ -63,6 +70,22 @@ runStateUsingReactiveRefAsync ref = Run.interpret (Run.on _externalState handle 
     handle :: forall a. ExternalState s a -> Run (EFFECT + AFF r) a
     handle (Get continue) = liftEffect (RR.read ref) <#> continue
     handle (Put state next) = liftAff (RR.pushAndWait state ref) $> next
+
+-- | Run some state under the focus of a bigger state
+runFocused :: forall s a r. Lens' s a -> Run (EXTERNAL_STATE a + EXTERNAL_STATE s r) ~> Run (EXTERNAL_STATE s r)
+runFocused lens = Run.interpret (Run.on _externalState handle Run.send)
+    where
+    handle :: ExternalState a ~> Run (EXTERNAL_STATE s r)
+    handle (Get continue) = get <#> (Lens.view lens >>> continue)
+    handle (Put state next) = (modify $ Lens.set lens state) $> next
+
+-- | Converts the state to internal state and then runs it purely
+runPure :: forall r s a. s -> Run (EXTERNAL_STATE s + STATE s r) a -> Run r (s /\ a)
+runPure initial= Run.interpret (Run.on _externalState handle Run.send) >>> State.runState initial
+    where
+    handle :: ExternalState s ~> Run (STATE s r)
+    handle (Get continue) = State.get <#> continue
+    handle (Put state next) = State.put state $> next
 
 ---------- Helpers
 gets :: forall r a b. (a -> b) -> Run (EXTERNAL_STATE a r) b

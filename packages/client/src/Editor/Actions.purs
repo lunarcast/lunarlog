@@ -3,20 +3,52 @@ module Loglude.Editor.Actions where
 import Loglude
 
 import Data.Array as Array
+import Data.HashMap as HashMap
 import Data.HashSet as HashSet
 import Data.Vec as Vec
 import Geometry (CanvasMouseEvent, Context2D, _position)
 import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
-import Loglude.Run.ExternalState (assign, modifying, use)
+import Loglude.Data.BiHashMap as BiHashMap
+import Loglude.Run.ExternalState (EXTERNAL_STATE, assign, get, gets, modifying, put, runFocused, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
-import Lunarlog.Core.NodeGraph (NodeId, PinId)
+import Lunarlog.Core.NodeGraph (NodeId(..), PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, Selection(..), _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _hovered, _mousePosition, _ruleBody, _ruleHead, _ruleNode, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), _atBranches, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _branches, _hovered, _mousePosition, _nextId, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
 
 ---------- Implementation
+constructNode :: forall r. PatternShape -> Run (EXTERNAL_STATE Natural r) (HashMap NodeId NodeGraph.Node)
+constructNode{ name, argumentCount }  = do
+    startingId <- get <#> natToInt
+    put (intToNat $ startingId + 2 * argumentCount + 1)
+    pure $ go startingId
+    where
+    go startingId = HashMap.fromArray $ Array.cons (NodeId startingId /\ node) pins 
+        where
+        node = NodeGraph.PatternNode
+            { name
+            , arguments: indices <#> \index-> NodeId (startingId + index)
+            }
+
+        pins = indices <#> \index -> NodeId (startingId + index) /\ NodeGraph.Unify (NodeGraph.PinId $ startingId + argumentCount + index)
+
+        nextId = startingId + argumentCount + 1
+        indices = Array.replicate argumentCount unit # Array.mapWithIndex (((+) 1) >>> const)
+
+-- | Construct a rule containing no data
+emptyRule :: forall r. PatternShape -> Run (EXTERNAL_STATE Natural r) NodeGraph.Rule
+emptyRule pattern = ado
+    startingId <- get <#> natToInt
+    nodes <- constructNode pattern
+    in NodeGraph.Rule
+        { head: NodeId startingId
+        , body: [NodeId startingId]
+        , connections: BiHashMap.empty
+        , nodes
+        }
+
 updateHovered :: Ask Context2D => ClientM Unit
 updateHovered = do
     mousePosition <- use _mousePosition
@@ -69,6 +101,27 @@ deleteNode nodeId = do
         pure true
     else
         pure false
+
+-- | Create an empty rule
+createRule :: String -> ClientM Unit
+createRule name = assign (_atBranches name) $ Just []
+
+-- | Create an empty branch
+createBranch :: PatternShape -> ClientM Unit
+createBranch pattern = do
+    newRule <- runFocused _nextId $ emptyRule pattern 
+    modifying (_branches pattern.name) $ flip Array.snoc newRule
+
+-- | Create an empty node
+createNode :: PatternShape -> ClientM Unit
+createNode pattern = do
+    nodeId <- gets (_.nextId >>> natToInt >>> NodeId)
+    nodes <- runFocused _nextId $ constructNode pattern 
+
+    modifying _ruleNodes $ HashMap.union nodes
+    assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position: vec2 200.0 200.0 }
+
+    toTop nodeId
 
 dropPattern :: NodeId -> ClientM Unit
 dropPattern nodeId = do

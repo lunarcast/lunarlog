@@ -4,16 +4,13 @@ import { Button, Input } from "./Input";
 import { ComponentChild } from "preact";
 import { Spacing } from "./Spacing";
 import { capitalize, capitalizeWord } from "./helpers";
-import { ForeignAction, ForeignThumbail } from "../foreign";
-import { Stream } from "../Stream";
+import { ForeignAction } from "../foreign";
 import { useImmer } from "use-immer";
 import { useKey, useBoolean } from "react-use";
 import { Icon } from "./Icon";
 
 // ========== Types
-interface RuleBranch {
-  thumbail: string;
-}
+interface RuleBranch {}
 
 interface Rule {
   branches: Array<RuleBranch>;
@@ -31,11 +28,13 @@ interface EditorPaneProps {
 interface NodeListProps {
   nodes: Array<[string, number]>;
   disabled?: boolean;
+  use(name: string): void;
 }
 
 interface NodeProps {
   name: string;
   argumentCount: number;
+  use(): void;
 }
 
 interface RuleListProps {
@@ -45,7 +44,6 @@ interface RuleListProps {
 }
 
 interface RuleBranchProps {
-  thumbail: string;
   name: string;
 }
 
@@ -65,7 +63,6 @@ interface CreateCompoundProps {
 
 interface EditorProps {
   emit(action: ForeignAction): void;
-  thumails: Stream<ForeignThumbail>;
   initializeEditor(name: string, argumentCount: number): void;
 }
 
@@ -104,9 +101,9 @@ const EditorPane = ({ children, title, disabled }: EditorPaneProps) => {
   );
 };
 
-const Node = ({ argumentCount, name }: NodeProps) => {
+const Node = ({ argumentCount, name, use }: NodeProps) => {
   return (
-    <div className="node">
+    <div className="node" onClick={use}>
       <div className="node__name">{name}</div>
       <div className="node__argument-count">{argumentCount}</div>
     </div>
@@ -122,7 +119,7 @@ const EmptyNodeList = () => {
 };
 
 // The node list panel
-const NodeList = ({ nodes, disabled }: NodeListProps) => {
+const NodeList = ({ nodes, disabled, use }: NodeListProps) => {
   return (
     <EditorPane
       title="Use node"
@@ -132,7 +129,12 @@ const NodeList = ({ nodes, disabled }: NodeListProps) => {
     >
       <div id="node-list">
         {nodes.map(([name, argumentCount]) => (
-          <Node name={name} key={name} argumentCount={argumentCount} />
+          <Node
+            name={name}
+            key={name}
+            use={() => use(name)}
+            argumentCount={argumentCount}
+          />
         ))}
       </div>
       {nodes.length === 0 && <EmptyNodeList />}
@@ -141,17 +143,8 @@ const NodeList = ({ nodes, disabled }: NodeListProps) => {
 };
 
 // The preview for a rule
-const RuleBranch = ({ thumbail, name }: RuleBranchProps) => {
-  return (
-    <div className="rule__branch">
-      <img
-        src={thumbail}
-        height={100}
-        alt={name}
-        className="rule__branch-thumbail"
-      />
-    </div>
-  );
+const RuleBranch = ({ name }: RuleBranchProps) => {
+  return <div className="rule__branch"></div>;
 };
 
 // The rule list panel
@@ -163,8 +156,8 @@ const BranchList = ({ branches, name, createBranch }: BranchListProps) => {
         <button className="rule__create-branch" onClick={createBranch}>
           <Icon>add</Icon>
         </button>
-        {branches.map(({ thumbail }, index) => (
-          <RuleBranch name={name} thumbail={thumbail} key={index} />
+        {branches.map((_, index) => (
+          <RuleBranch name={name} key={index} />
         ))}
       </div>
     </div>
@@ -277,16 +270,21 @@ export const EditorUi = (props: EditorProps) => {
       if (!Reflect.has(rules, name)) return;
 
       setRules((draft: RuleMemory) => {
-        draft[name].branches.push({
-          thumbail: "",
-        });
+        draft[name].branches.push({});
       });
 
-      setCurrentBranch([name, rules[name].branches.length]);
+      const argumentCount = rules[name].branches.length;
+      setCurrentBranch([name, argumentCount]);
 
       if (!initializedPurescript) {
         props.initializeEditor(name, nodes[name]);
         setInitializedPurescript(true);
+      } else {
+        props.emit({
+          _type: "createBranch",
+          argumentCount,
+          name,
+        });
       }
     },
     [rules]
@@ -323,7 +321,18 @@ export const EditorUi = (props: EditorProps) => {
     [currentBranch]
   );
 
-  console.log({ currentBranch });
+  const addNode = useCallback(
+    (name: string) => {
+      const argumentCount = nodes[name];
+
+      props.emit({
+        _type: "addNode",
+        name,
+        argumentCount,
+      });
+    },
+    [nodes]
+  );
 
   return (
     <div id="editor" class={isHidden ? "editor__hidden" : ""}>
@@ -345,6 +354,7 @@ export const EditorUi = (props: EditorProps) => {
         create={createNode}
       />
       <NodeList
+        use={addNode}
         disabled={currentBranch === null}
         nodes={[...Object.entries(nodes)]}
       />

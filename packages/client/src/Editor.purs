@@ -23,40 +23,23 @@ import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (deleteConnection, deleteNode, dropPattern, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
+import Loglude.Editor.Actions (createBranch, createNode, createRule, deleteConnection, deleteNode, dropPattern, emptyRule, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
 import Loglude.Editor.Components.Connection (connection)
 import Loglude.Editor.Settings (hoveredConnectionWeight)
-import Loglude.Run.ExternalState (assign, get, modifying, use)
+import Loglude.Run.ExternalState (assign, get, modifying, runPure, use)
 import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..))
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, InitialState, KeyboardAction(..), PatternAction(..), PatternShape, PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, ForeignAction(..), InitialRule, InitialState, KeyboardAction(..), PatternAction(..), PatternShape, PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Prelude (const, when, zero)
+import Run as Run
 import Web.Event.Event (EventType(..))
 import Web.UIEvent.KeyboardEvent as KeyboardEvent
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
 ---------- Constants
-emptyRule :: { name :: String, argumentCount :: Int } -> Int -> Int /\ NodeGraph.Rule
-emptyRule { name, argumentCount } startingId = nextId /\
-    NodeGraph.Rule
-    { head: NodeId startingId
-    , body: [NodeId startingId]
-    , nodes: HashMap.fromArray $ Array.cons (NodeId startingId /\ node) pins 
-    , connections: BiHashMap.empty
-    }
-    where
-    node = NodeGraph.PatternNode
-        { name
-        , arguments: indices <#> \index-> NodeId (startingId + index)
-        }
-
-    pins = indices <#> \index -> NodeId (startingId + index) /\ NodeGraph.Unify (NodeGraph.PinId index)
-
-    nextId = startingId + argumentCount + 1
-    indices = Array.replicate argumentCount unit # Array.mapWithIndex (((+) 1) >>> const)
 
 emptyVisualGraph :: Natural -> VisualGraph.Rule
 emptyVisualGraph id =
@@ -66,13 +49,13 @@ emptyVisualGraph id =
     }
 
 ---------- Implementation
-initialState :: PatternShape -> InitialState
+initialState :: PatternShape -> InitialRule ()
 initialState { name, argumentCount } =
     { rule
-    , nextId: intToNat nextId
+    , nextId: nextId
     }
     where
-    nextId /\ rule = emptyRule { name, argumentCount } 0
+    nextId /\ rule = Run.extract $ runPure zero $ emptyRule { name, argumentCount }
 
 scene :: Ask Context2D => InitialState -> Tea EditorState EditorGeometryId EditorAction
 scene initial =
@@ -96,11 +79,14 @@ scene initial =
         Cancelable.subscribe (eventStream KeyboardEvent.fromEvent (EventType "keypress")) \keyEvent -> case KeyboardEvent.key keyEvent of
             "Delete" -> launchAff_ $ propagateAction (KeyboardAction DeleteKey)
             _ -> pure unit
-
+        Cancelable.subscribe initial.foreignActions \action -> launchAff_ $ propagateAction $ ForeignAction action
 
     handleAction :: EditorAction -> TeaM EditorState EditorGeometryId EditorAction Unit
     handleAction = case _ of
-        ForeignAction _ -> pure unit
+        ForeignAction (CreateBranch name argumentCount) -> createBranch { name, argumentCount }
+        ForeignAction (AddNode name argumentCount) -> createNode { name, argumentCount }
+        ForeignAction (CreateRule name) -> createRule name
+        ForeignAction _  -> pure unit
         KeyboardAction DeleteKey -> do
             use _selection >>= case _ of
                 SelectedNode id -> do

@@ -44,4 +44,4 @@ _maybeUnitToBoolean = iso to from
     from false = Nothing 
     
     to Nothing = false
-    to _ = true 
+    to _ = true

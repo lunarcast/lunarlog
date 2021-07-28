@@ -5,6 +5,7 @@ import Loglude
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Lens.Index (ix)
+import FRP.Stream as Stream
 import Geometry (Vec2, CanvasMouseEvent)
 import Loglude.Data.BiHashMap (_atBiHashMap, _atBiHashMapConnection)
 import Loglude.Run.ExternalState (EXTERNAL_STATE, modifying, use)
@@ -33,6 +34,7 @@ data KeyboardAction
 -- | An action introduced by the typescript side
 data ForeignAction
     = CreateBranch String Int
+    | AddNode String Int
     | EditBranch String Int
     | CreateRule String
 
@@ -58,10 +60,20 @@ type PatternShape =
     , name :: String
     }
 
-type InitialState =
+type ThumnailData =
+    { name :: String
+    , index :: Int
+    , thumnail :: String
+    }
+
+type InitialRule r = 
     { rule :: NodeGraph.Rule
     , nextId :: Natural
-    }
+    | r }
+
+type InitialState = InitialRule 
+    ( foreignActions :: Stream.Discrete ForeignAction
+    )
 
 type EditorState = 
     { remainingModule :: NodeGraph.Module
@@ -111,6 +123,15 @@ _selectedPin :: Prism' Selection PinId
 _selectedPin = prism' SelectedPin case _ of
     SelectedPin id -> Just id
     _ -> Nothing
+
+_module :: Lens' EditorState NodeGraph.Module
+_module = prop (Proxy :: _ "remainingModule")
+
+_atBranches :: String -> Lens' EditorState (Maybe (Array NodeGraph.Rule))
+_atBranches name = _module <<< _atHashMap name
+
+_branches :: String -> AffineTraversal' EditorState (Array NodeGraph.Rule)
+_branches name = _atBranches name <<< _Just
 
 _rule :: Lens' EditorState NodeGraph.Rule
 _rule = prop (Proxy :: _ "rule")

@@ -127,6 +127,11 @@
   cursor: pointer;
 }
 
+#node-list > .node:hover {
+  filter: brightness(1.7);
+  box-shadow: 0.4rem 0.4rem 0.3rem 0.1rem rgba(darken($very-dark, 7), 0.6);
+}
+
 #create-node {
   display: flex;
   flex-direction: column;

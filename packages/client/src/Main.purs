@@ -12,23 +12,19 @@ import Geometry (launchTea)
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Lunarlog.Canvas (fixDpi)
 import Lunarlog.Editor (initialState, scene)
-import Lunarlog.Editor.Types (ForeignAction(..), PatternShape)
+import Lunarlog.Editor.Types (ForeignAction(..), PatternShape, ThumnailData)
 import Lunarlog.VisualGraph.Image (renderPatternToImage)
+import Record as Record
 
 type Constructors a=
     { createBranch :: Fn2 String Int a
+    , addNode :: Fn2 String Int a
     , editBranch :: Fn2 String Int a
     , createRule :: String -> a
     }
 
-type ThumbailData =
-    { name :: String
-    , index :: Int
-    , thumbail :: String
-    }
-
 type Result = 
-    { thumbails :: Stream.Discrete ThumbailData }
+    { thumnails :: Stream.Discrete ThumnailData }
 
 type ForeignInput a =
     { actions :: Stream.Discrete a
@@ -44,11 +40,13 @@ constructors :: Constructors ForeignAction
 constructors =
     { createBranch: mkFn2 CreateBranch
     , editBranch: mkFn2 EditBranch
+    , addNode: mkFn2 AddNode
     , createRule: CreateRule
     }
 
 mainImpl :: ForeignInput ForeignAction -> Cancelable Result 
 mainImpl input = do
+    thumnails <- liftEffect Stream.create
     liftEffect (getCanvasElementById "canvas") >>= traverse_ \canvas ->  do
         ctx <- liftEffect $ getContext2D canvas
         liftEffect $ fixDpi ctx
@@ -56,8 +54,10 @@ mainImpl input = do
         let zoom = 2.0
 
         provide ctx $ launchTea $ scene
-            $ initialState input.initialState
+            $ Record.union (initialState input.initialState)
+                { foreignActions: input.actions
+                }
     
     pure 
-        { thumbails: empty
+        { thumnails: thumnails.event
         }

@@ -18,18 +18,11 @@ export const renderPatternToImage = (
 interface ForeignConstructors<T> {
   createRule(name: string): T;
   createBranch(name: string, argCount: number): T;
+  addNode(name: string, argCount: number): T;
   editBranch(name: string, index: number): T;
 }
 
-export interface ForeignThumbail {
-  thumbail: string;
-  name: string;
-  index: number;
-}
-
-export interface ForeignArguments {
-  thumbails: ForeignStream<ForeignThumbail>;
-}
+export interface ForeignArguments {}
 
 export type ForeignAction = ADT<{
   createRule: {
@@ -42,6 +35,10 @@ export type ForeignAction = ADT<{
   editBranch: {
     name: string;
     index: number;
+  };
+  addNode: {
+    name: string;
+    argumentCount: number;
   };
 }>;
 
@@ -78,6 +75,8 @@ export const main = (
               constructors.createBranch(name, argumentCount),
             editBranch: ({ name, index }) =>
               constructors.editBranch(name, index),
+            addNode: ({ name, argumentCount }) =>
+              constructors.addNode(name, argumentCount),
           })
         )()
       ),
