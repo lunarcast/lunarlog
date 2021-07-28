@@ -3,6 +3,7 @@ import { useState, useEffect } from "preact/hooks";
 import { Button, Input } from "./Input";
 import { ComponentChild } from "preact";
 import { Spacing } from "./Spacing";
+import { capitalize } from "./helpers";
 
 // ========== Types
 type NodeMemory = Record<string, number>;
@@ -15,6 +16,7 @@ interface EditorPaneProps {
 
 interface NodeListProps {
   nodes: Array<[string, number]>;
+  disabled?: boolean;
 }
 
 interface NodeProps {
@@ -22,9 +24,12 @@ interface NodeProps {
   argumentCount: number;
 }
 
-interface CreateNodeProps {
+interface CreateCompoundProps {
   isTaken(name: string): boolean;
   createNode(name: string, argumentCount: number): void;
+  productName: string;
+  allowUpdates?: boolean;
+  disabled?: boolean;
 }
 
 // ========== Constants
@@ -36,6 +41,9 @@ const nodeAdjective = [
   "cool",
   "important",
   "special",
+  "unique",
+  "original",
+  "creative",
 ];
 
 // ========== Components
@@ -60,7 +68,12 @@ const EditorPane = ({ children, title, disabled }: EditorPaneProps) => {
 };
 
 const Node = ({ argumentCount, name }: NodeProps) => {
-  return <div className="node">{name}</div>;
+  return (
+    <div className="node">
+      <div className="node__name">{name}</div>
+      <div className="node__argument-count">{argumentCount}</div>
+    </div>
+  );
 };
 
 const EmptyNodeList = () => {
@@ -71,11 +84,13 @@ const EmptyNodeList = () => {
   );
 };
 
-const NodeList = ({ nodes }: NodeListProps) => {
+const NodeList = ({ nodes, disabled }: NodeListProps) => {
   return (
     <EditorPane
-      disabled={"Cannot use nodes without creating a rule first"}
       title="Use node"
+      disabled={
+        disabled ? "Cannot use nodes without creating a rule first" : undefined
+      }
     >
       <div id="node-list">
         {nodes.map(([name, argumentCount]) => (
@@ -87,19 +102,25 @@ const NodeList = ({ nodes }: NodeListProps) => {
   );
 };
 
-const CreateNode = ({ isTaken, createNode }: CreateNodeProps) => {
+const CreateCompound = ({
+  isTaken,
+  createNode,
+  productName,
+  allowUpdates,
+  disabled,
+}: CreateCompoundProps) => {
   const [name, setName] = useState("");
   const [argCount, setArgCount] = useState(2);
   let error: null | string = null;
 
-  if (isTaken(name)) {
+  if (isTaken(name) && !allowUpdates) {
     error = `Name "${name}" is already taken`;
   }
 
   const resetInputs = () => {
     const adjective =
       nodeAdjective[Math.floor(Math.random() * nodeAdjective.length)];
-    setName(`My ${adjective} node`);
+    setName(`My ${adjective} ${productName}`);
     setArgCount(2);
   };
 
@@ -107,10 +128,23 @@ const CreateNode = ({ isTaken, createNode }: CreateNodeProps) => {
     resetInputs();
   }, []);
 
+  const action = allowUpdates && isTaken(name) ? "Update" : "Create";
+
   return (
-    <EditorPane title="Create node">
+    <EditorPane
+      title={`Create ${productName}`}
+      disabled={
+        disabled
+          ? "Cannot create nodes without creating a rule first"
+          : undefined
+      }
+    >
       <div id="create-node">
-        <Input value={name} label="Node name" setValue={setName} />
+        <Input
+          value={name}
+          label={`${capitalize(productName)} name`}
+          setValue={setName}
+        />
         <Input
           type="number"
           value={argCount}
@@ -131,7 +165,7 @@ const CreateNode = ({ isTaken, createNode }: CreateNodeProps) => {
               }
             }}
           >
-            Create
+            {action} {productName}
           </Button>
         </div>
       </div>
@@ -144,15 +178,24 @@ export const EditorUi = () => {
 
   return (
     <div id="editor">
-      <NodeList nodes={[...Object.entries(nodeMemory)]} />
-      <CreateNode
+      <CreateCompound
+        disabled
+        allowUpdates
+        productName="node"
+        isTaken={(name) => Reflect.has(nodeMemory, name)}
+        createNode={(name, argumentCount) =>
+          setNodeMemory((old) => ({ ...old, [name]: argumentCount }))
+        }
+      />
+      <NodeList disabled nodes={[...Object.entries(nodeMemory)]} />
+      <CreateCompound
+        productName={"rule"}
         isTaken={(name) => Reflect.has(nodeMemory, name)}
         createNode={(name, argumentCount) =>
           setNodeMemory((old) => ({ ...old, [name]: argumentCount }))
         }
       />
       <div className="editor__pane">3</div>
-      <div className="editor__pane">4</div>
       <div className="editor__pane">7</div>
       <div className="editor__pane">8</div>
     </div>

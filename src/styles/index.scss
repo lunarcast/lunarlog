@@ -36,3 +36,24 @@ html {
 * {
   -webkit-user-drag: none;
 }
+
+// Custom scrollbar
+* {
+  scrollbar-color: $primary-bright;
+  scrollbar-width: 1rem;
+
+  &::-webkit-scrollbar {
+    width: 1rem;
+  }
+
+  &::-webkit-scrollbar-track {
+    @include dropShadow();
+    background: $very-dark;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: $primary-bright;
+    outline: none;
+    border: none;
+  }
+}
