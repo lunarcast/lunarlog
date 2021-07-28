@@ -1,0 +1,61 @@
+@use "sass:math";
+@import "../theme.scss";
+
+.input {
+  display: flex;
+  flex-direction: column;
+
+  padding: $spacing;
+}
+
+.input > .input__label {
+  font-size: 1rem;
+  margin-bottom: math.div($spacing, 2);
+  color: $on-dark;
+  font-family: $fonts-roboto-slab;
+}
+
+.input > .input__input {
+  color: $on-dark-pale;
+  background: darken($primary-dark, 2);
+
+  padding: $spacing;
+  box-sizing: border-box;
+
+  border: none;
+  outline: none;
+
+  transition: filter $transition-time;
+
+  &:hover {
+    filter: brightness(1.2);
+  }
+
+  &:focus {
+    filter: brightness(1.6);
+    box-shadow: 0.1rem 0.1rem 0.3rem 0.1rem rgba(darken($very-dark, 7), 0.6);
+  }
+}
+
+.button {
+  @include dropShadow();
+  padding: $spacing;
+  box-sizing: border-box;
+
+  color: $on-dark-pale;
+  background: $primary;
+
+  border: none;
+  outline: none;
+
+  border-radius: 0.2rem;
+  font-size: 1.1rem;
+
+  transition: filter $transition-time, box-shadow $transition-time;
+  filter: brightness(1.6);
+}
+
+.button:hover {
+  filter: brightness(2);
+  box-shadow: 0.3rem 0.3rem 0.3rem 0.1rem rgba(darken($very-dark, 7), 0.6);
+}

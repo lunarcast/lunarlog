@@ -16,5 +16,8 @@ esbuild
     jsxFactory: "h",
     jsxFragment: "Fragment",
     inject: ["./src/preact-shim.ts"],
+    loader: {
+      ".svg": "file",
+    },
   })
   .catch((_e) => process.exit(1));

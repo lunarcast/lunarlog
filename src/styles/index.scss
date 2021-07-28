@@ -1,14 +1,6 @@
 @import "./theme.scss";
 @import "./components/tabs.scss";
 
-body,
-html {
-  padding: 0;
-  margin: 0;
-  height: 100%;
-  width: 100%;
-}
-
 #app > .app__layer {
   height: 100%;
   width: 100%;
@@ -18,4 +10,29 @@ html {
 
   position: absolute;
   background: $very-dark;
+}
+
+// ========== Resetting annoying stuff
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+body,
+html {
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+* {
+  -webkit-user-drag: none;
 }

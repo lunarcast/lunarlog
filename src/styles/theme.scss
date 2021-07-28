@@ -1,12 +1,27 @@
 @import url("https://fonts.googleapis.com/css2?family=Ubuntu:wght@300&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Roboto+Slab&display=swap");
 
 $very-dark: #171520;
 $primary-dark: #241b2f;
 $primary: #262335;
+$dark-input-bg: #2a2139;
 
+$on-dark: #ffffff;
 $on-primary: #e2e2e2;
+$on-dark-pale: #d7c9aa;
+
+$error: #f16a6a;
+$bright: #36f9f6;
+$disabled: #5f5e65;
+$blue: #2667ff;
+$secondary: #6af1b8;
 
 $spacing: 1rem;
 $transition-time: 0.2s;
 
 $fonts-ubuntu: "Ubuntu", sans-serif;
+$fonts-roboto-slab: "Roboto Slab", serif;
+
+@mixin dropShadow {
+  box-shadow: 0.1rem 0.1rem 0.3rem 0.1rem rgba(darken($very-dark, 7), 0.6);
+}
