@@ -6,11 +6,15 @@ dependencies:
   '@thi.ng/matrices': 0.6.59
   '@thi.ng/vectors': 6.0.1
   immer: 9.0.5
+  moo: 0.5.1
+  nearley: 2.20.1
   preact: 10.5.14
   react-use: 17.2.4
   ts-adt: 2.1.2
   use-immer: 0.6.0_immer@9.0.5
 devDependencies:
+  '@types/moo': 0.5.5
+  '@types/nearley': 2.11.2
   '@types/node': 16.4.3
   esbuild: 0.12.9
   esbuild-plugin-alias: 0.1.2
@@ -406,6 +410,14 @@ packages:
     dev: false
     resolution:
       integrity: sha512-aLkWa0C0vO5b4Sr798E26QgOkss68Un0bLjs7u9qxzPT5CG+8DuNTffWES58YzJs3hrVAOs1wonycqEBqNJubA==
+  /@types/moo/0.5.5:
+    dev: true
+    resolution:
+      integrity: sha512-eXQpwnkI4Ntw5uJg6i2PINdRFWLr55dqjuYQaLHNjvqTzF14QdNWbCbml9sza0byyXNA0hZlHtcdN+VNDcgVHA==
+  /@types/nearley/2.11.2:
+    dev: true
+    resolution:
+      integrity: sha512-jeyIDNBxxyWyEk6HemDC+t32b4fxthVsgWDxf88qD2WpX0QpOyY8JvA80AElPTBGRUsO0EKnr6OeVOjK3ZDdnA==
   /@types/node/16.4.3:
     dev: true
     resolution:
@@ -645,6 +657,10 @@ packages:
       node: '>=0.1.90'
     resolution:
       integrity: sha512-a+UqTh4kgZg/SlGvfbzDHpgRu7AAQOmmqRHJnxhRZICKFUT91brVhNNt58CMWU9PsBbv3PDCZUHbVxuDiH2mtA==
+  /commander/2.20.3:
+    dev: false
+    resolution:
+      integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==
   /component-emitter/1.3.0:
     dev: true
     resolution:
@@ -758,6 +774,10 @@ packages:
     dev: true
     resolution:
       integrity: sha1-l4hXRCxEdJ5CBmE+N5RiBYJqvYA=
+  /discontinuous-range/1.0.0:
+    dev: false
+    resolution:
+      integrity: sha1-44Mx8IRLukm5qctxx3FYWqsbxlo=
   /duplexer/0.1.2:
     dev: true
     resolution:
@@ -1396,6 +1416,10 @@ packages:
       node: '>=0.10.0'
     resolution:
       integrity: sha512-WRoDn//mXBiJ1H40rqa3vH0toePwSsGb45iInWlTySa+Uu4k3tYUSxa2v1KqAiLtvlrSzaExqS1gtk96A9zvEA==
+  /moo/0.5.1:
+    dev: false
+    resolution:
+      integrity: sha512-I1mnb5xn4fO80BH9BLcF0yLypy2UKl+Cb01Fu0hJRkJjlCRtxZMWkTdAtDd5ZqCOxtCkhmRwyI57vWT+1iZ67w==
   /morgan/1.10.0:
     dependencies:
       basic-auth: 2.0.1
@@ -1455,6 +1479,16 @@ packages:
       node: '>=0.10.0'
     resolution:
       integrity: sha512-fpoe2T0RbHwBTBUOftAfBPaDEi06ufaUai0mE6Yn1kacc3SnTErfb/h+X94VXzI64rKFHYImXSvdwGGCmwOqCA==
+  /nearley/2.20.1:
+    dependencies:
+      commander: 2.20.3
+      moo: 0.5.1
+      railroad-diagrams: 1.0.0
+      randexp: 0.4.6
+    dev: false
+    hasBin: true
+    resolution:
+      integrity: sha512-+Mc8UaAebFzgV+KpI5n7DasuuQCHA89dmwm7JXw3TV43ukfNQ9DnBH3Mdb2g/I4Fdxc26pwimBWvjIw0UAILSQ==
   /negotiator/0.6.2:
     dev: true
     engines:
@@ -1588,6 +1622,19 @@ packages:
       node: '>=0.8.0'
     resolution:
       integrity: sha1-o/3xvvtzD5UZZYcqwvYHTGFHelY=
+  /railroad-diagrams/1.0.0:
+    dev: false
+    resolution:
+      integrity: sha1-635iZ1SN3t+4mcG5Dlc3RVnN234=
+  /randexp/0.4.6:
+    dependencies:
+      discontinuous-range: 1.0.0
+      ret: 0.1.15
+    dev: false
+    engines:
+      node: '>=0.12'
+    resolution:
+      integrity: sha512-80WNmd9DA0tmZrw9qQa62GPPWfuXJknrmVmLcxvq4uZBdYqb1wYoKTmnlGUchvVWe0XiLupYkBoXVOxz3C8DYQ==
   /range-parser/1.2.1:
     dev: true
     engines:
@@ -1701,7 +1748,6 @@ packages:
     resolution:
       integrity: sha512-wENBPt4ySzg4ybFQW2TT1zMQucPK95HSh/nq2CFTZVOGut2+pQvSsgtda4d26YrYcr067wjbmzOG8byDPBX63A==
   /ret/0.1.15:
-    dev: true
     engines:
       node: '>=0.12'
     resolution:
@@ -2115,6 +2161,8 @@ specifiers:
   '@thi.ng/hiccup-canvas': ^1.2.5
   '@thi.ng/matrices': ^0.6.59
   '@thi.ng/vectors': ^6.0.1
+  '@types/moo': ^0.5.5
+  '@types/nearley': ^2.11.2
   '@types/node': ^16.4.3
   esbuild: ^0.12.9
   esbuild-plugin-alias: ^0.1.2
@@ -2122,6 +2170,8 @@ specifiers:
   esbuild-sass-plugin: ^1.4.7
   immer: ^9.0.5
   live-server: ^1.2.1
+  moo: ^0.5.1
+  nearley: ^2.20.1
   preact: ^10.5.14
   react-use: ^17.2.4
   sass: ^1.35.1

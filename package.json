@@ -4,6 +4,8 @@
     "dev": "rm -rf dist && mkdir dist && cp public/* dist -r && node ./build & live-server dist"
   },
   "devDependencies": {
+    "@types/moo": "^0.5.5",
+    "@types/nearley": "^2.11.2",
     "@types/node": "^16.4.3",
     "esbuild": "^0.12.9",
     "esbuild-plugin-alias": "^0.1.2",
@@ -21,6 +23,8 @@
     "@thi.ng/matrices": "^0.6.59",
     "@thi.ng/vectors": "^6.0.1",
     "immer": "^9.0.5",
+    "moo": "^0.5.1",
+    "nearley": "^2.20.1",
     "preact": "^10.5.14",
     "react-use": "^17.2.4",
     "ts-adt": "^2.1.2",
