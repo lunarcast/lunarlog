@@ -13,7 +13,7 @@ import Loglude.Run.ExternalState (EXTERNAL_STATE, assign, get, gets, modifying, 
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..), PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), _atBranches, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _branches, _hovered, _mousePosition, _nextId, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _hovered, _module, _mousePosition, _nextId, _rule, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _rulePath, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -102,15 +102,17 @@ deleteNode nodeId = do
     else
         pure false
 
--- | Create an empty rule
-createRule :: String -> ClientM Unit
-createRule name = assign (_atBranches name) $ Just []
+createVisualPattern :: NodeId -> ClientM Unit
+createVisualPattern nodeId = assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position: vec2 200.0 200.0 }
 
 -- | Create an empty branch
-createBranch :: PatternShape -> ClientM Unit
-createBranch pattern = do
+createBranch :: BranchPath -> PatternShape -> ClientM Unit
+createBranch path pattern = do
+    nodeId <- gets (_.nextId >>> natToInt >>> NodeId)
     newRule <- runFocused _nextId $ emptyRule pattern 
-    modifying (_branches pattern.name) $ flip Array.snoc newRule
+
+    assign (_atBranch path) $ Just newRule
+    createVisualPattern nodeId
 
 -- | Create an empty node
 createNode :: PatternShape -> ClientM Unit
@@ -118,10 +120,27 @@ createNode pattern = do
     nodeId <- gets (_.nextId >>> natToInt >>> NodeId)
     nodes <- runFocused _nextId $ constructNode pattern 
 
+    -- Mark the node itself for diplay
     modifying _ruleNodes $ HashMap.union nodes
-    assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position: vec2 200.0 200.0 }
+    createVisualPattern nodeId
 
     toTop nodeId
+
+editBranch :: String /\ Int -> ClientM Unit
+editBranch newPath = do
+    -- Save current branch
+    currentPath <- use _rulePath
+    currentRule <- use _rule
+    assign (_atBranch currentPath) $ Just currentRule
+
+    -- Remember the new branch
+    use (_atBranch newPath) >>= traverse_ \rule -> do
+        assign _rule rule
+        assign _rulePath newPath
+
+        assign _selection NoSelection
+        assign _hovered []
+
 
 dropPattern :: NodeId -> ClientM Unit
 dropPattern nodeId = do

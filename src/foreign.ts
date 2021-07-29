@@ -17,7 +17,11 @@ export const renderPatternToImage = (
 
 interface ForeignConstructors<T> {
   createRule(name: string): T;
-  createBranch(name: string, argCount: number): T;
+  createBranch(
+    name: string,
+    index: number,
+    pattern: { name: string; argumentCount: number }
+  ): T;
   addNode(name: string, argCount: number): T;
   editBranch(name: string, index: number): T;
 }
@@ -25,12 +29,10 @@ interface ForeignConstructors<T> {
 export interface ForeignArguments {}
 
 export type ForeignAction = ADT<{
-  createRule: {
-    name: string;
-  };
   createBranch: {
     name: string;
     argumentCount: number;
+    index: number;
   };
   editBranch: {
     name: string;
@@ -50,6 +52,8 @@ export interface InitialState {
 interface MainArgs<T> {
   actions: ForeignStream<T>;
   initialState: InitialState;
+  branchName: string;
+  branchIndex: number;
 }
 
 const rawMain = (
@@ -61,18 +65,20 @@ const rawMain = (
 };
 
 export const main = (
+  path: [string, number],
   initialState: InitialState,
   stream: Stream<ForeignAction>
 ) =>
   rawMain((constructors) => ({
+    branchName: path[0],
+    branchIndex: path[1],
     initialState,
     actions: (emit) => () =>
       stream((tsAction) =>
         emit(
           matchI(tsAction)({
-            createRule: ({ name }) => constructors.createRule(name),
-            createBranch: ({ name, argumentCount }) =>
-              constructors.createBranch(name, argumentCount),
+            createBranch: ({ name, argumentCount, index }) =>
+              constructors.createBranch(name, index, { name, argumentCount }),
             editBranch: ({ name, index }) =>
               constructors.editBranch(name, index),
             addNode: ({ name, argumentCount }) =>

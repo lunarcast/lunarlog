@@ -43,7 +43,7 @@ data Declaration
     = RuleDeclaration (Array Rule)
     | AdtDeclaration AdtDeclaration
 
-type Module = HashMap String (Array Rule)
+type Module = HashMap (String /\ Int) Rule
 
 ---------- Lenses
 _ruleNodes :: Lens' Rule (HashMap NodeId Node)
@@ -70,8 +70,17 @@ _ruleConnections = _Newtype <<< prop (Proxy :: _ "connections")
 derive newtype instance Show PinId
 derive newtype instance Show NodeId
 
+derive instance Generic Rule _
+derive instance Generic Node _
+
 derive newtype instance Debug PinId
 derive newtype instance Debug NodeId
+
+instance Debug Node where
+    debug = genericDebug
+
+instance Debug Rule where
+    debug = genericDebug
 
 derive instance Eq NodeId
 derive instance Eq PinId

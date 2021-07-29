@@ -168,14 +168,41 @@
 $ruleBranchRowHeight: 100px;
 
 .rule > .rule__branches {
-  height: $ruleBranchRowHeight;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   overflow-x: auto;
+
+  cursor: pointer;
+
+  * {
+    margin-left: math.div($spacing, 3);
+    margin-right: math.div($spacing, 3);
+  }
 }
 
-.rule > .rule__branches > .rule_branch > img {
-  height: $ruleBranchRowHeight;
+.rule > .rule__branches > button {
+  padding: math.div($spacing, 2);
+  margin-top: $spacing;
+  margin-bottom: $spacing;
+  cursor: pointer;
+}
+
+.rule > .rule__branches > .rule__branch.rule__branch--selected {
+  border: 2px solid $secondary;
+}
+
+.rule > .rule__branches > .rule__branch {
+  @include dropShadow();
+
+  margin-top: $spacing;
+  padding: $spacing;
+
+  display: flex;
+  justify-content: flex-end;
+
+  .material-icons {
+    cursor: pointer;
+  }
 }
 
 // ========== Media queries

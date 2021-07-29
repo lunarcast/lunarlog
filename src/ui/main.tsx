@@ -40,17 +40,26 @@ interface NodeProps {
 interface RuleListProps {
   rules: RuleMemory;
   disabled?: boolean;
+  selectedBranch: null | [string, number];
   createBranch(name: string): void;
-}
-
-interface RuleBranchProps {
-  name: string;
+  select(name: string, index: number): void;
+  edit(name: string, index: number): void;
 }
 
 interface BranchListProps {
   branches: Array<RuleBranch>;
   name: string;
+  selectedBranch: null | number;
   createBranch(): void;
+  select(index: number): void;
+  edit(index: number): void;
+}
+
+interface RuleBranchProps {
+  name: string;
+  isSelected: boolean;
+  select(): void;
+  edit(): void;
 }
 
 interface CreateCompoundProps {
@@ -63,7 +72,11 @@ interface CreateCompoundProps {
 
 interface EditorProps {
   emit(action: ForeignAction): void;
-  initializeEditor(name: string, argumentCount: number): void;
+  initializeEditor(
+    path: [string, number],
+    name: string,
+    argumentCount: number
+  ): void;
 }
 
 // ========== Constants
@@ -92,6 +105,7 @@ const EditorPane = ({ children, title, disabled }: EditorPaneProps) => {
         <header className="editor__pane-title">{title}</header>
         <main className="editor__pane-body">{children}</main>
       </div>
+
       {disabled && (
         <div className="editor__pane-disabled-overlay">
           <span className="editor__pane-disabled-reason">{disabled}</span>{" "}
@@ -143,28 +157,58 @@ const NodeList = ({ nodes, disabled, use }: NodeListProps) => {
 };
 
 // The preview for a rule
-const RuleBranch = ({ name }: RuleBranchProps) => {
-  return <div className="rule__branch"></div>;
+const RuleBranch = ({ edit, select, isSelected }: RuleBranchProps) => {
+  return (
+    <div
+      className={["rule__branch", isSelected && "rule__branch--selected"].join(
+        " "
+      )}
+      onClick={select}
+    >
+      <Icon onClick={edit}>edit</Icon>
+      <Icon>delete</Icon>
+    </div>
+  );
 };
 
 // The rule list panel
-const BranchList = ({ branches, name, createBranch }: BranchListProps) => {
+const BranchList = ({
+  branches,
+  name,
+  createBranch,
+  selectedBranch,
+  edit,
+  select,
+}: BranchListProps) => {
   return (
     <div className="rule">
       <div className="rule__name">{capitalizeWord(name)}</div>
       <div className="rule__branches">
-        <button className="rule__create-branch" onClick={createBranch}>
-          <Icon>add</Icon>
-        </button>
         {branches.map((_, index) => (
-          <RuleBranch name={name} key={index} />
+          <RuleBranch
+            isSelected={index === selectedBranch}
+            name={name}
+            key={index}
+            select={() => select(index)}
+            edit={() => edit(index)}
+          />
         ))}
+        <Button onClick={createBranch}>
+          <Icon>add</Icon>
+        </Button>
       </div>
     </div>
   );
 };
 
-const RuleList = ({ rules, disabled, createBranch }: RuleListProps) => {
+const RuleList = ({
+  rules,
+  disabled,
+  createBranch,
+  selectedBranch,
+  edit,
+  select,
+}: RuleListProps) => {
   return (
     <EditorPane
       title="Rules"
@@ -172,10 +216,15 @@ const RuleList = ({ rules, disabled, createBranch }: RuleListProps) => {
     >
       {Object.entries(rules).map(([name, branches]) => (
         <BranchList
+          selectedBranch={
+            selectedBranch?.[0] === name ? selectedBranch[1] : null
+          }
           createBranch={() => createBranch(name)}
           name={name}
           key={name}
           branches={branches.branches}
+          edit={(index) => edit(name, index)}
+          select={(index) => select(name, index)}
         />
       ))}
     </EditorPane>
@@ -273,17 +322,18 @@ export const EditorUi = (props: EditorProps) => {
         draft[name].branches.push({});
       });
 
-      const argumentCount = rules[name].branches.length;
-      setCurrentBranch([name, argumentCount]);
+      const ruleIndex = rules[name].branches.length;
 
       if (!initializedPurescript) {
-        props.initializeEditor(name, nodes[name]);
+        setCurrentBranch([name, ruleIndex]);
+        props.initializeEditor([name, ruleIndex], name, nodes[name]);
         setInitializedPurescript(true);
       } else {
         props.emit({
           _type: "createBranch",
-          argumentCount,
+          argumentCount: nodes[name],
           name,
+          index: ruleIndex,
         });
       }
     },
@@ -296,11 +346,6 @@ export const EditorUi = (props: EditorProps) => {
     });
 
     createNode(name, argumentCount);
-
-    props.emit({
-      _type: "createRule",
-      name,
-    });
   }, []);
 
   const createNode = useCallback((name: string, argumentCount: number) => {
@@ -311,7 +356,9 @@ export const EditorUi = (props: EditorProps) => {
 
   useKey(
     "s",
-    () => {
+    (e) => {
+      if (e.target instanceof HTMLInputElement) return;
+
       if (currentBranch === null) return;
       toggleHidden();
     },
@@ -334,6 +381,16 @@ export const EditorUi = (props: EditorProps) => {
     [nodes]
   );
 
+  const selectNode = useCallback((name: string, index: number) => {
+    setCurrentBranch([name, index]);
+
+    props.emit({
+      _type: "editBranch",
+      index,
+      name,
+    });
+  }, []);
+
   return (
     <div id="editor" class={isHidden ? "editor__hidden" : ""}>
       <CreateCompound
@@ -342,7 +399,13 @@ export const EditorUi = (props: EditorProps) => {
         create={createRule}
       />
       <RuleList
+        selectedBranch={currentBranch}
         createBranch={createBranch}
+        select={selectNode}
+        edit={(name, index) => {
+          selectNode(name, index);
+          toggleHidden();
+        }}
         disabled={Object.entries(rules).length === 0}
         rules={rules}
       />

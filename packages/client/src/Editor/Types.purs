@@ -31,12 +31,13 @@ data EditorGeometryId
 data KeyboardAction
     = DeleteKey
 
+type BranchPath = String /\ Int
+
 -- | An action introduced by the typescript side
 data ForeignAction
-    = CreateBranch String Int
-    | AddNode String Int
+    = CreateBranch BranchPath PatternShape
     | EditBranch String Int
-    | CreateRule String
+    | AddNode String Int
 
 -- | All the possibe actions which can be triggered during the lifetime of an editor
 data EditorAction
@@ -73,11 +74,13 @@ type InitialRule r =
 
 type InitialState = InitialRule 
     ( foreignActions :: Stream.Discrete ForeignAction
+    , branchPath :: BranchPath
     )
 
 type EditorState = 
     { remainingModule :: NodeGraph.Module
     , rule :: NodeGraph.Rule
+    , rulePath :: BranchPath
     , visualRule :: VisualGraph.Rule
     , selection :: Selection
     , hovered :: HoverTarget
@@ -127,11 +130,11 @@ _selectedPin = prism' SelectedPin case _ of
 _module :: Lens' EditorState NodeGraph.Module
 _module = prop (Proxy :: _ "remainingModule")
 
-_atBranches :: String -> Lens' EditorState (Maybe (Array NodeGraph.Rule))
-_atBranches name = _module <<< _atHashMap name
+_atBranch :: BranchPath -> Lens' EditorState (Maybe NodeGraph.Rule)
+_atBranch path = _module <<< _atHashMap path
 
-_branches :: String -> AffineTraversal' EditorState (Array NodeGraph.Rule)
-_branches name = _atBranches name <<< _Just
+_branch :: BranchPath -> AffineTraversal' EditorState NodeGraph.Rule
+_branch path = _atBranch path <<< _Just
 
 _rule :: Lens' EditorState NodeGraph.Rule
 _rule = prop (Proxy :: _ "rule")
@@ -147,6 +150,9 @@ _atRuleConnection from to = _rule <<< NodeGraph._ruleConnections <<< _atBiHashMa
 
 _ruleBody :: Lens' EditorState (Array NodeId)
 _ruleBody = _rule <<< NodeGraph._ruleBody
+
+_rulePath :: Lens' EditorState BranchPath
+_rulePath = prop (Proxy :: _ "rulePath")
 
 _ruleHead :: Lens' EditorState NodeId
 _ruleHead = _rule <<< NodeGraph._ruleHead

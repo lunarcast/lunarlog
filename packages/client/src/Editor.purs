@@ -23,7 +23,7 @@ import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (createBranch, createNode, createRule, deleteConnection, deleteNode, dropPattern, emptyRule, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
+import Loglude.Editor.Actions (createBranch, createNode, deleteConnection, deleteNode, dropPattern, editBranch, emptyRule, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
 import Loglude.Editor.Components.Connection (connection)
 import Loglude.Editor.Settings (hoveredConnectionWeight)
 import Loglude.Run.ExternalState (assign, get, modifying, runPure, use)
@@ -67,6 +67,7 @@ scene initial =
         , mousePosition: zero
         , rule: initial.rule
         , nextId: initial.nextId
+        , rulePath: initial.branchPath
         }
     , render
     , handleAction
@@ -83,10 +84,9 @@ scene initial =
 
     handleAction :: EditorAction -> TeaM EditorState EditorGeometryId EditorAction Unit
     handleAction = case _ of
-        ForeignAction (CreateBranch name argumentCount) -> createBranch { name, argumentCount }
+        ForeignAction (CreateBranch path pattern) -> createBranch path pattern
         ForeignAction (AddNode name argumentCount) -> createNode { name, argumentCount }
-        ForeignAction (CreateRule name) -> createRule name
-        ForeignAction _  -> pure unit
+        ForeignAction (EditBranch name index)  -> editBranch (name /\ index)
         KeyboardAction DeleteKey -> do
             use _selection >>= case _ of
                 SelectedNode id -> do
