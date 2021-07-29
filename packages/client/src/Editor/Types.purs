@@ -39,6 +39,7 @@ data ForeignAction
     = CreateBranch BranchPath PatternShape
     | EditBranch String Int
     | AddNode String Int
+    | TogglePointerEvents Boolean
 
 -- | All the possibe actions which can be triggered during the lifetime of an editor
 data EditorAction
@@ -80,6 +81,7 @@ type EditorState =
     , hovered :: HoverTarget
     , mousePosition :: Vec2
     , nextId :: Natural
+    , pointerEventsEnabled :: Boolean
     }
 
 ---------- Helpers
@@ -105,6 +107,9 @@ selectionToNodeId (SelectedNode id) = Just $ NodeGeometry id
 selectionToNodeId _ = Nothing
 
 ---------- Lenses
+_pointerEventsEnabled :: Lens' EditorState Boolean
+_pointerEventsEnabled = prop (Proxy :: _ "pointerEventsEnabled")
+
 _nextId :: Lens' EditorState Natural
 _nextId = prop (Proxy :: _ "nextId")
 

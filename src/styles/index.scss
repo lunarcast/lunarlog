@@ -10,6 +10,7 @@
 
   position: absolute;
   background: transparent;
+  pointer-events: painted;
 }
 
 .app__layer#canvas {

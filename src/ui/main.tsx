@@ -354,11 +354,15 @@ export const EditorUi = (props: EditorProps) => {
 
       if (currentBranch === null) return;
       toggleHidden();
+      props.emit({
+        _type: "togglePointerEvents",
+        shouldGetEnabled: !isHidden,
+      });
     },
     {
       target: window,
     },
-    [currentBranch]
+    [currentBranch, isHidden]
   );
 
   const addNode = useCallback(

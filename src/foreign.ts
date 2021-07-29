@@ -24,6 +24,7 @@ interface ForeignConstructors<T> {
   ): T;
   addNode(name: string, argCount: number): T;
   editBranch(name: string, index: number): T;
+  togglePointerEvents(shouldGetEnabled: boolean): T;
 }
 
 export interface ForeignArguments {}
@@ -41,6 +42,9 @@ export type ForeignAction = ADT<{
   addNode: {
     name: string;
     argumentCount: number;
+  };
+  togglePointerEvents: {
+    shouldGetEnabled: boolean;
   };
 }>;
 
@@ -68,6 +72,8 @@ export const main = (stream: Stream<ForeignAction>) =>
               constructors.editBranch(name, index),
             addNode: ({ name, argumentCount }) =>
               constructors.addNode(name, argumentCount),
+            togglePointerEvents: ({ shouldGetEnabled }) =>
+              constructors.togglePointerEvents(shouldGetEnabled),
           })
         )()
       ),

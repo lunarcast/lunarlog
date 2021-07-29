@@ -24,7 +24,7 @@ import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (createBranch, createNode, deleteConnection, deleteNode, dropPattern, editBranch, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
+import Loglude.Editor.Actions (createBranch, createNode, deleteConnection, deleteNode, dropPattern, editBranch, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered, usesPointerEvents)
 import Loglude.Editor.Components.Connection (connection)
 import Loglude.Editor.Settings (hoveredConnectionWeight)
 import Loglude.Run.ExternalState (assign, get, modifying, use)
@@ -32,7 +32,7 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, ForeignAction(..), InitialState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _rule, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, ForeignAction(..), InitialState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _pointerEventsEnabled, _rule, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Prelude (const, when, zero)
 import Web.Event.Event (EventType(..))
 import Web.UIEvent.KeyboardEvent as KeyboardEvent
@@ -50,6 +50,7 @@ scene initial =
         , mousePosition: zero
         , nextId: zero
         , currentRule: Nothing
+        , pointerEventsEnabled: false
         }
     , render
     , handleAction
@@ -69,14 +70,15 @@ scene initial =
         ForeignAction (CreateBranch path pattern) -> createBranch path pattern
         ForeignAction (AddNode name argumentCount) -> createNode { name, argumentCount }
         ForeignAction (EditBranch name index) -> editBranch (name /\ index)
-        KeyboardAction DeleteKey -> do
+        ForeignAction (TogglePointerEvents shouldGetEnabled) -> assign _pointerEventsEnabled shouldGetEnabled
+        KeyboardAction DeleteKey -> usesPointerEvents do
             use _selection >>= case _ of
                 SelectedNode id -> do
                     success <- deleteNode id
                     when success do
                         assign _selection NoSelection
                 _ -> pure unit
-        NodeAction (SelectNode event path) -> do
+        NodeAction (SelectNode event path) -> usesPointerEvents do
             rememberMousePosition event
             let nodeId = NonEmptyArray.head path
             selectNode nodeId
@@ -85,7 +87,7 @@ scene initial =
                 Just parent -> selectNestedNode { parent, nodeId }
             -- We do not want to select more than one thing at once
             stopPropagation
-        NodeAction (SelectPin event pinId path) -> do
+        NodeAction (SelectPin event pinId path) -> usesPointerEvents do
             rememberMousePosition event
 
             for_ (Array.last path) (selectPin pinId)
@@ -101,11 +103,11 @@ scene initial =
                     _ -> pure unit
             where
             removeSelection = assign _selection NoSelection
-        MouseUp event -> do
+        MouseUp event -> usesPointerEvents do
             handleAction $ RefreshSelection event
-        DeleteConnection from to -> do
+        DeleteConnection from to -> usesPointerEvents do
             deleteConnection from to
-        MouseMove event -> do
+        MouseMove event -> usesPointerEvents do
             oldPosition <- get <#> view _mousePosition
             rememberMousePosition event
 

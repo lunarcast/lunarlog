@@ -6,7 +6,6 @@ import Data.Array as Array
 import Data.HashMap as HashMap
 import Data.HashSet as HashSet
 import Data.Vec as Vec
-import Debug (traceM)
 import Geometry (CanvasMouseEvent, Context2D, _position)
 import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
 import Loglude.Data.BiHashMap as BiHashMap
@@ -14,7 +13,8 @@ import Loglude.Run.ExternalState (EXTERNAL_STATE, assign, get, gets, modifying, 
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..), PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _currentRule, _hovered, _mousePosition, _nextId, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _currentRule, _hovered, _mousePosition, _nextId, _pointerEventsEnabled, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Prelude (when)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -103,6 +103,13 @@ deleteNode nodeId = do
     else
         pure false
 
+-- | Only run a computation when pointer events are enabled
+usesPointerEvents :: ClientM Unit -> ClientM Unit
+usesPointerEvents computation = do
+    shouldRun <- use _pointerEventsEnabled
+    when shouldRun computation
+
+-- | Create some basic position data about a node
 createVisualPattern :: NodeId -> ClientM Unit
 createVisualPattern nodeId = assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position: vec2 200.0 200.0 }
 

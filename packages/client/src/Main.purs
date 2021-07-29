@@ -11,13 +11,14 @@ import Geometry (launchTea)
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Lunarlog.Canvas (fixDpi)
 import Lunarlog.Editor (scene)
-import Lunarlog.Editor.Types (ForeignAction(..), ThumnailData, PatternShape)
+import Lunarlog.Editor.Types (ForeignAction(..), PatternShape, ThumnailData)
 import Lunarlog.VisualGraph.Image (renderPatternToImage)
 
-type Constructors a=
+type Constructors a =
     { createBranch :: Fn3 String Int PatternShape a
     , addNode :: Fn2 String Int a
     , editBranch :: Fn2 String Int a
+    , togglePointerEvents :: Boolean -> a
     }
 
 type Result = 
@@ -27,7 +28,7 @@ type ForeignInput a =
     { actions :: Stream.Discrete a
     }
 
-type Main = (forall a. Constructors a -> ForeignInput a) -> Cancelable Result
+type Main = Constructors ~> ForeignInput -> Cancelable Result
 
 main :: Main
 main convert = mainImpl $ convert constructors
@@ -37,6 +38,7 @@ constructors =
     { createBranch: mkFn3 $ curry CreateBranch
     , editBranch: mkFn2 EditBranch
     , addNode: mkFn2 AddNode
+    , togglePointerEvents: TogglePointerEvents
     }
 
 mainImpl :: ForeignInput ForeignAction -> Cancelable Result 
