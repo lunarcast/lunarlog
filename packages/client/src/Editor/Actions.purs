@@ -13,8 +13,15 @@ import Loglude.Run.ExternalState (EXTERNAL_STATE, assign, get, gets, modifying, 
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..), PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), BranchPath, _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _currentRule, _hovered, _mousePosition, _nextId, _pointerEventsEnabled, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), ForeignSubstitution, _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _currentRule, _hovered, _module, _mousePosition, _nextId, _pointerEventsEnabled, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Expression (freeVarsConstructor)
+import Lunarlog.Expression as Expression
+import Lunarlog.Parser.Cst as Cst
+import Lunarlog.Search.Naive as Search
 import Prelude (when)
+import Run (extract)
+import Run.Reader (runReader)
+import Run.Supply (runSupply)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -204,3 +211,26 @@ selectNestedNode { parent, nodeId } = do
             let newPosition = mousePosition - fixedRelativeMousePosition
 
             assign (_visualRuleNode nodeId <<< VisualGraph._patternNode <<< _position) newPosition
+
+evaluateQuery :: Cst.Pattern -> ClientM (Array ForeignSubstitution)
+evaluateQuery cst = ado
+    module_ <- use _module
+    let context 
+          = module_
+          # HashMap.toArrayBy (/\)
+          # map (first fst) -- (a /\ b) /\ c -> a /\ c
+          # foldr (\(name /\ rule) -> HashMap.insertWith (<>) name [rule]) HashMap.empty
+          
+    let goal = Expression.constructorFromCst cst
+    let solutions
+          = Search.solve [goal]
+          # runSupply ((+) 1) 0
+          # runReader context
+          # extract
+    in solutions
+        <#> \solution -> freeVarsConstructor goal
+            # Array.fromFoldable
+            <#> \var -> 
+                { name: var
+                , solution: maybe "-" show (HashMap.lookup var solution)
+                }

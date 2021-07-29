@@ -56,6 +56,7 @@ module Loglude
     , module Run.Reader
     , module Run.State
     , module Run.Writer
+    , module Run.Supply
     , module Math
     , module Data.Exists
     , module Data.Profunctor.Strong
@@ -69,20 +70,19 @@ module Loglude
 
 import Prelude
 
-import Loglude.Data.BiHashMap (BiHashMap)
 import Control.Monad.Rec.Class (Step(..), tailRec)
 import Control.Plus ((<|>), class Alt, class Plus, alt, empty)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Debug (class Debug, debug, genericDebug)
 import Data.Either (Either(..), either, isLeft, isRight, note)
 import Data.Exists (Exists, mkExists, runExists)
-import Data.Foldable (class Foldable, foldMap, foldl, foldr, for_, sum)
+import Data.Foldable (class Foldable, foldrDefault, foldlDefault, foldMap, foldl, foldr, for_, sum)
 import Data.Generic.Rep (class Generic)
 import Data.HashMap (HashMap)
 import Data.HashSet (HashSet)
 import Data.Hashable (class Hashable, hash)
 import Data.Int (floor, toNumber, even, odd)
-import Data.Lens (Lens', Lens, Prism', Setter, Setter', Getter, Getter', Traversal, Traversal', traversed, _Just, _Nothing, _Left, _Right, over, set, preview, view, lens, prism')
+import Data.Lens (Lens', Lens, Prism', Setter, Setter', Getter, Getter', Traversal, Traversal', sequenceOf, sequenceOf_, traverseOf, traversed, _Just, _Nothing, _Left, _Right, over, set, preview, view, lens, prism')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Lens.Tuple (_1, _2)
 import Data.Lens.Record (prop)
@@ -93,7 +93,7 @@ import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Profunctor.Strong ((&&&), (***), class Strong, first, second, fanout, splitStrong)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
-import Data.Traversable (class Traversable, traverse_, traverse, for, for_)
+import Data.Traversable (class Traversable, sequenceDefault, traverseDefault, traverse_, traverse, for, for_)
 import Data.Tuple (Tuple(..), curry, uncurry, swap, fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Typelevel.Num (D0, D1, D2, D3, D4, D6, d0, d1, d2, d3, d4, d6)
@@ -108,6 +108,7 @@ import Foreign (Foreign)
 import Foreign.Object (Object)
 import Loglude.Ask (class Ask, ask, provide)
 import Loglude.Cancelable (Cancelable)
+import Loglude.Data.BiHashMap (BiHashMap)
 import Loglude.Data.Debug (debugSpy, logPretty, myDebug, showPretty)
 import Loglude.Data.Exists (mapExists)
 import Loglude.Data.Lens (_atHashMap)
@@ -125,6 +126,7 @@ import Run (EFFECT, Run, AFF)
 import Run.Except (EXCEPT, FAIL)
 import Run.Reader (READER)
 import Run.State (STATE)
+import Run.Supply (SUPPLY)
 import Run.Writer (WRITER)
 import Type.Proxy (Proxy(..))
 import Type.Row (type (+))

@@ -9,11 +9,11 @@ const mkParser = (start: string) => {
   return (input: string) => {
     const parser = new Parser(grammar);
 
-    parser.feed(input);
+    parser.feed(input + "#eof");
 
     return parser.results[0];
   };
 };
 
 /** Parser a textul representation of a lunarlog compound */
-export const parsePattern = mkParser("pattern");
+export const parsePattern = mkParser("patternEof");

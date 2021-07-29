@@ -42,3 +42,10 @@ export const streamFromForeign =
   <T>(foreign: ForeignStream<T>): Stream<T> =>
   (emit) =>
     foreign((v) => () => emit(v))();
+
+/** Transform a typescript stream into a purescript one */
+export const streamToForeign =
+  <T>(familiar: Stream<T>): ForeignStream<T> =>
+  (emit) =>
+  () =>
+    familiar((v) => emit(v)());

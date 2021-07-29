@@ -1,34 +1,39 @@
 import { ADT, match, matchI } from "ts-adt";
 // @ts-ignore
 import * as purescript from "../output/Main";
+import { Constructor } from "./parser/ast";
 import { Effect, ForeignStream, Stream } from "./Stream";
 
 export const renderPatternToImage = (
   name: string,
   arguments_: number
 ): Promise<string> => {
-  console.log(
-    purescript.renderPatternToImage({ name, arguments: arguments_ })()
-  );
-
   return purescript.renderPatternToImage({ name, arguments: arguments_ })()
     .value0;
 };
 
 interface ForeignConstructors<T> {
   createRule(name: string): T;
+  addNode(name: string, argCount: number): T;
+  editBranch(name: string, branchId: number): T;
+  deleteBranch(name: string, branchId: number): T;
+  togglePointerEvents(shouldGetEnabled: boolean): T;
+  evaluateQuery(query: Constructor): T;
   createBranch(
     name: string,
     branchId: number,
     pattern: { name: string; argumentCount: number }
   ): T;
-  addNode(name: string, argCount: number): T;
-  editBranch(name: string, branchId: number): T;
-  deleteBranch(name: string, branchId: number): T;
-  togglePointerEvents(shouldGetEnabled: boolean): T;
 }
 
-export interface ForeignArguments {}
+export type Substitution = Array<{
+  name: string;
+  solution: string;
+}>;
+
+export interface ForeignArguments {
+  queryResults: ForeignStream<Array<Substitution>>;
+}
 
 export type ForeignAction = ADT<{
   createBranch: {
@@ -50,6 +55,9 @@ export type ForeignAction = ADT<{
   };
   togglePointerEvents: {
     shouldGetEnabled: boolean;
+  };
+  evaluateQuery: {
+    query: Constructor;
   };
 }>;
 
@@ -81,6 +89,7 @@ export const main = (stream: Stream<ForeignAction>) =>
               constructors.togglePointerEvents(shouldGetEnabled),
             deleteBranch: ({ name, branchId }) =>
               constructors.deleteBranch(name, branchId),
+            evaluateQuery: ({ query }) => constructors.evaluateQuery(query),
           })
         )()
       ),

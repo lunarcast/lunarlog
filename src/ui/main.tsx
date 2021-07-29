@@ -4,13 +4,14 @@ import { Button, Input } from "./Input";
 import { ComponentChild } from "preact";
 import { Spacing } from "./Spacing";
 import { capitalize, capitalizeWord } from "./helpers";
-import { ForeignAction } from "../foreign";
+import { ForeignAction, Substitution } from "../foreign";
 import { useImmer } from "use-immer";
 import { useKey, useBoolean, useCounter } from "react-use";
 import { Icon } from "./Icon";
 import type { ADT } from "ts-adt";
 import { parsePattern } from "../parser/parser";
 import * as Ast from "../parser/ast";
+import { Stream, useStream } from "../Stream";
 
 // ========== Types
 type BranchId = number;
@@ -87,10 +88,17 @@ interface CreateCompoundProps {
 
 interface EditorProps {
   emit(action: ForeignAction): void;
+  queryResults: Stream<Array<Substitution>>;
 }
 
 interface EditQueryProps {
   disabled?: boolean;
+  queryResults: Stream<Array<Substitution>>;
+  evaluate(query: Ast.Constructor): void;
+}
+
+interface QueryResultProps {
+  substitutions: Array<Substitution>;
 }
 
 // ========== Constants
@@ -311,6 +319,7 @@ const CreateCompound = ({
 
         <div id="create-node__button-container">
           <Button
+            disabled={!!error}
             onClick={() => {
               if (error === null) {
                 createNode(name, argCount);
@@ -326,11 +335,38 @@ const CreateCompound = ({
   );
 };
 
+const QueryResult = (props: QueryResultProps) => {
+  return (
+    <div className="query__result-container">
+      <div class="query__result-row">
+        {props.substitutions[0].map(({ name }) => (
+          <div key={name}>{name}</div>
+        ))}
+      </div>
+      {props.substitutions.map((substitution, index) => (
+        <div class="query__result-row" key={index}>
+          {substitution.map(({ name, solution }) => (
+            <div key={name}>{solution}</div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const EditQuery = (props: EditQueryProps) => {
   const [query, setQuery] = useState("");
   const [parsingResult, setParsingResult] = useState<ParsedQuery>();
+  const [currentResult, setCurrentResult] =
+    useState<null | Array<Substitution>>([
+      [
+        { name: "a", solution: "-" },
+        { name: "b", solution: "a" },
+        { name: "c", solution: "a" },
+      ],
+    ]);
 
-  console.log(parsingResult);
+  useStream(props.queryResults, setCurrentResult);
 
   const updateQuery = (newQuery: string) => {
     setQuery(newQuery);
@@ -346,6 +382,9 @@ const EditQuery = (props: EditQueryProps) => {
       });
     } catch (e) {
       const message: string = e.message;
+
+      setCurrentResult(null);
+
       setParsingResult({
         _type: "failure",
         message: message.slice(
@@ -361,19 +400,23 @@ const EditQuery = (props: EditQueryProps) => {
   return (
     <EditorPane
       title="Edit query"
-      disabled={props.disabled ? "Cannot query an empty project" : undefined}
+      //disabled={props.disabled ? "Cannot query an empty project" : undefined}
     >
       <div className="query">
         <Input value={query} label="Query" setValue={updateQuery} />
         {parsingResult?._type === "failure" && (
           <div className="query__error-message">{parsingResult.message}</div>
         )}
-
+        {currentResult && <QueryResult substitutions={currentResult} />}
         <Spacing />
         <div className="query__evaluate-button-container">
           <Button
             disabled={parsingResult?._type !== "success"}
-            onClick={() => {}}
+            onClick={() => {
+              if (parsingResult?._type === "success") {
+                props.evaluate(parsingResult.result);
+              }
+            }}
           >
             Evaluate
           </Button>
@@ -528,7 +571,11 @@ export const EditorUi = (props: EditorProps) => {
         disabled={currentBranch === null}
         nodes={[...Object.entries(nodes)]}
       />
-      <EditQuery disabled={currentBranch === null} />
+      <EditQuery
+        disabled={currentBranch === null}
+        queryResults={props.queryResults}
+        evaluate={(query) => props.emit({ _type: "evaluateQuery", query })}
+      />
       <div className="editor__pane">8</div>
     </div>
   );

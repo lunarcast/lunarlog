@@ -5,6 +5,7 @@ const { var_, natural, constructor, list, pattern } = require("./ast.ts")
 
 @lexer lexer
 
+patternEof -> pattern %eof {% id %}
 pattern -> patternName _ (term _ {% id %}):* {% ([name, _, arguments_]) => constructor(name, arguments_) %}
 
 term 

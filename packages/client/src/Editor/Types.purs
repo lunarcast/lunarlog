@@ -13,6 +13,7 @@ import Loglude.Run.ExternalState (EXTERNAL_STATE, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId, PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
+import Lunarlog.Parser.Cst as Cst
 
 ---------- Types
 data PatternAction
@@ -41,6 +42,7 @@ data ForeignAction
     | DeleteBranch String Int
     | AddNode String Int
     | TogglePointerEvents Boolean
+    | EvaluateQuery Cst.Pattern
 
 -- | All the possibe actions which can be triggered during the lifetime of an editor
 data EditorAction
@@ -70,8 +72,10 @@ type ThumnailData =
     , thumnail :: String
     }
 
+type ForeignSubstitution = Array { name :: String, solution :: String }
 type InitialState = 
     { foreignActions :: Stream.Discrete ForeignAction
+    , emitQueryResult :: Array ForeignSubstitution -> Effect Unit 
     }
 
 type EditorState = 

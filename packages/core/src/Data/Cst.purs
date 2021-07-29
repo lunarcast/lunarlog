@@ -1,4 +1,4 @@
-module Loglude.Parser.Cst where
+module Lunarlog.Parser.Cst where
 
 import Loglude
 
@@ -53,7 +53,8 @@ newtype Term = Term (Variant TermR)
 
 type Rule = 
     { head :: Pattern
-    , body :: Array Pattern }
+    , body :: Array Pattern
+    }
 
 ---------- Typeclass instances
 derive instance eqPosition :: Eq SourcePosition

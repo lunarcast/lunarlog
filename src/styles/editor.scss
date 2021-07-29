@@ -226,6 +226,31 @@ $ruleBranchRowHeight: 100px;
   white-space: pre-line;
 }
 
+.query > .query__result-container {
+  @include dropShadow();
+  margin: $spacing;
+  padding: $spacing;
+
+  & > .query__result-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+
+    overflow-x: auto;
+    width: 100%;
+    background: $primary;
+    padding: $spacing;
+  }
+
+  & > .query__result-row:first-child {
+    font-variant: bold;
+  }
+
+  & > .query__result-row:nth-child(even) {
+    filter: brightness(1.7);
+  }
+}
+
 .query > .query__evaluate-button-container {
   display: flex;
   justify-content: flex-end;

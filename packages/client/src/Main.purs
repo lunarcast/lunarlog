@@ -11,7 +11,8 @@ import Geometry (launchTea)
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Lunarlog.Canvas (fixDpi)
 import Lunarlog.Editor (scene)
-import Lunarlog.Editor.Types (ForeignAction(..), PatternShape, ThumnailData)
+import Lunarlog.Editor.Types (ForeignAction(..), ForeignSubstitution, PatternShape)
+import Lunarlog.Parser.Cst as Cst
 import Lunarlog.VisualGraph.Image (renderPatternToImage)
 
 type Constructors a =
@@ -20,10 +21,12 @@ type Constructors a =
     , editBranch :: Fn2 String Int a
     , deleteBranch :: Fn2 String Int a
     , togglePointerEvents :: Boolean -> a
+    , evaluateQuery :: Cst.Pattern -> a
     }
 
 type Result = 
-    { thumnails :: Stream.Discrete ThumnailData }
+    { queryResults :: Stream.Discrete (Array ForeignSubstitution)
+    }
 
 type ForeignInput a =
     { actions :: Stream.Discrete a
@@ -41,11 +44,12 @@ constructors =
     , deleteBranch: mkFn2 DeleteBranch
     , addNode: mkFn2 AddNode
     , togglePointerEvents: TogglePointerEvents
+    , evaluateQuery: EvaluateQuery
     }
 
 mainImpl :: ForeignInput ForeignAction -> Cancelable Result 
 mainImpl input = do
-    thumnails <- liftEffect Stream.create
+    queryResults <- liftEffect Stream.create
     liftEffect (getCanvasElementById "canvas") >>= traverse_ \canvas ->  do
         ctx <- liftEffect $ getContext2D canvas
         liftEffect $ fixDpi ctx
@@ -54,8 +58,9 @@ mainImpl input = do
 
         provide ctx $ launchTea $ scene
                 { foreignActions: input.actions
+                , emitQueryResult: queryResults.push
                 }
     
     pure 
-        { thumnails: thumnails.event
+        { queryResults: queryResults.event
         }

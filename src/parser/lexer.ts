@@ -3,6 +3,7 @@ import type { SourcePosition, Token } from "./ast";
 
 // ========== Actual lexer stuff
 export const lexer = moo.compile({
+  eof: "#eof",
   whitespace: /[ \t]+/,
   newline: { match: /(?:\r\n?|\n)+/, lineBreaks: true },
   punctuation: [",", "(", ")", "[", "]", "|"],

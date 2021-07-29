@@ -43,7 +43,6 @@ exports.nearleyPlugin = () => ({
           resolveDir: args.pluginData.resolveDir,
         };
       } catch (e) {
-        console.log(e.token);
         return {
           errors: [
             {
