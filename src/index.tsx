@@ -10,13 +10,7 @@ const editorUi = document.getElementById("app__ui");
 if (editorUi !== null) {
   const [actionStream, emitAction] = create<ForeignAction>();
 
-  const init = (
-    path: [string, number],
-    name: string,
-    argumentCount: number
-  ) => {
-    const _ = main(path, { argumentCount, name }, actionStream);
-  };
+  main(actionStream);
 
-  render(<EditorUi initializeEditor={init} emit={emitAction} />, editorUi);
+  render(<EditorUi emit={emitAction} />, editorUi);
 }

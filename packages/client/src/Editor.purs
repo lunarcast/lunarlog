@@ -13,6 +13,7 @@ import Data.MouseButton (nothingPressed)
 import Data.Traversable (sequence)
 import Data.Undefined.NoProblem as Opt
 import Effect.Aff (launchAff_)
+import FRP.Stream (previewMap)
 import FRP.Stream as Stream
 import Geoemtry.Data.AABB as AABB
 import Geometry (Geometry, MultiStepRenderer, Tea, Vec2, ReporterOutput, _position, x)
@@ -23,51 +24,32 @@ import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (createBranch, createNode, deleteConnection, deleteNode, dropPattern, editBranch, emptyRule, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
+import Loglude.Editor.Actions (createBranch, createNode, deleteConnection, deleteNode, dropPattern, editBranch, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered)
 import Loglude.Editor.Components.Connection (connection)
 import Loglude.Editor.Settings (hoveredConnectionWeight)
-import Loglude.Run.ExternalState (assign, get, modifying, runPure, use)
+import Loglude.Run.ExternalState (assign, get, modifying, use)
 import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
-import Lunarlog.Core.NodeGraph (NodeId(..))
+import Lunarlog.Core.NodeGraph (NodeId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, ForeignAction(..), InitialRule, InitialState, KeyboardAction(..), PatternAction(..), PatternShape, PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, ForeignAction(..), InitialState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _rule, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Prelude (const, when, zero)
-import Run as Run
 import Web.Event.Event (EventType(..))
 import Web.UIEvent.KeyboardEvent as KeyboardEvent
 import Web.UIEvent.MouseEvent as MouseEvent
 import Web.UIEvent.MouseEvent.EventTypes as EventTypes
 
----------- Constants
-
-emptyVisualGraph :: Natural -> VisualGraph.Rule
-emptyVisualGraph id =
-    { nodes: HashMap.fromArray
-        [ NodeId (natToInt id) /\ VisualGraph.PatternNode { position: vec2 200.0 200.0 }
-        ]
-    }
-
 ---------- Implementation
-initialState :: PatternShape -> InitialRule ()
-initialState { name, argumentCount } =
-    { rule
-    , nextId: nextId
-    }
-    where
-    nextId /\ rule = Run.extract $ runPure zero $ emptyRule { name, argumentCount }
-
 scene :: Ask Context2D => InitialState -> Tea EditorState EditorGeometryId EditorAction
 scene initial =
     { initialState: 
-        { visualRule: emptyVisualGraph zero
-        , remainingModule: HashMap.empty
+        { visualRule: { nodes: HashMap.empty }
+        , module: HashMap.empty
         , selection: NoSelection
         , hovered: []
         , mousePosition: zero
-        , rule: initial.rule
-        , nextId: initial.nextId
-        , rulePath: initial.branchPath
+        , nextId: zero
+        , currentRule: Nothing
         }
     , render
     , handleAction
@@ -86,7 +68,7 @@ scene initial =
     handleAction = case _ of
         ForeignAction (CreateBranch path pattern) -> createBranch path pattern
         ForeignAction (AddNode name argumentCount) -> createNode { name, argumentCount }
-        ForeignAction (EditBranch name index)  -> editBranch (name /\ index)
+        ForeignAction (EditBranch name index) -> editBranch (name /\ index)
         KeyboardAction DeleteKey -> do
             use _selection >>= case _ of
                 SelectedNode id -> do
@@ -135,18 +117,20 @@ scene initial =
                     modifying (_visualRule <<< VisualGraph._ruleNodes <<< _atHashMap id <<< _Just <<< VisualGraph._patternNode <<< _position) ((+) delta)
 
     render :: Stream.Discrete EditorState -> Stream.Discrete (MultiStepRenderer _ _)
-    render state = ado
-        step1 <- step1 state
-        step2 <- connections state
-        step3 <- connectionPreview state
-        in (1 /\ step1) /\ 
-            [ step2 >>> Tuple 0
-            , step3 >>> Tuple 2
-            ]
+    render state = state <#> preview _rule <#> isJust # Aged.dropDuplicates # flip Stream.bind case _ of
+        false -> pure $ (0 /\ Geometry.None zero) /\ []
+        true -> ado
+            step1 <- step1 state
+            step2 <- connections state
+            step3 <- connectionPreview state
+            in (1 /\ step1) /\ 
+                [ step2 >>> Tuple 0
+                , step3 >>> Tuple 2
+                ]
         
     step1 :: Stream.Discrete EditorState -> Stream.Discrete (Geometry _ _)
     step1 state = state 
-            <#> _.rule
+            # previewMap _rule
             # Aged.dropDuplicates
             <#> (view NodeGraph._ruleBody &&& view NodeGraph._ruleNodes)
             # flip Stream.bind \(bodyNodes /\ nodes) -> Stream.do
@@ -165,7 +149,7 @@ scene initial =
                             # Aged.dropDuplicates
                             # Aged.dropDuplicatesOn _Just
                         , headId: state 
-                            <#> view _ruleHead
+                            # previewMap _ruleHead
                             # Aged.dropDuplicates
                         }
                     pure $ mapAction NodeAction geometry
@@ -198,7 +182,7 @@ connections ::
     Stream.Discrete (ReporterOutput EditorGeometryId -> Geometry EditorGeometryId EditorAction)
 connections state = ado
     connections <- state
-        <#> view _ruleConnections
+        # previewMap _ruleConnections
         # Aged.dropDuplicates
         <#> BiHashMap.connections
     hoveredConnection <- state

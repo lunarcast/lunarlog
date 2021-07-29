@@ -44,16 +44,8 @@ export type ForeignAction = ADT<{
   };
 }>;
 
-export interface InitialState {
-  argumentCount: number;
-  name: string;
-}
-
 interface MainArgs<T> {
   actions: ForeignStream<T>;
-  initialState: InitialState;
-  branchName: string;
-  branchIndex: number;
 }
 
 const rawMain = (
@@ -64,15 +56,8 @@ const rawMain = (
   return [tuple.value0, tuple.value1];
 };
 
-export const main = (
-  path: [string, number],
-  initialState: InitialState,
-  stream: Stream<ForeignAction>
-) =>
+export const main = (stream: Stream<ForeignAction>) =>
   rawMain((constructors) => ({
-    branchName: path[0],
-    branchIndex: path[1],
-    initialState,
     actions: (emit) => () =>
       stream((tsAction) =>
         emit(

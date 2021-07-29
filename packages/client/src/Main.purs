@@ -10,10 +10,9 @@ import FRP.Stream as Stream
 import Geometry (launchTea)
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Lunarlog.Canvas (fixDpi)
-import Lunarlog.Editor (initialState, scene)
+import Lunarlog.Editor (scene)
 import Lunarlog.Editor.Types (ForeignAction(..), ThumnailData, PatternShape)
 import Lunarlog.VisualGraph.Image (renderPatternToImage)
-import Record as Record
 
 type Constructors a=
     { createBranch :: Fn3 String Int PatternShape a
@@ -26,9 +25,6 @@ type Result =
 
 type ForeignInput a =
     { actions :: Stream.Discrete a
-    , initialState :: PatternShape
-    , branchName :: String
-    , branchIndex :: Int
     }
 
 type Main = (forall a. Constructors a -> ForeignInput a) -> Cancelable Result
@@ -53,9 +49,7 @@ mainImpl input = do
         let zoom = 2.0
 
         provide ctx $ launchTea $ scene
-            $ Record.union (initialState input.initialState)
                 { foreignActions: input.actions
-                , branchPath: input.branchName /\ input.branchIndex
                 }
     
     pure 

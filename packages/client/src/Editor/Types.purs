@@ -4,6 +4,7 @@ import Loglude
 
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
+import Data.Lens.AffineTraversal (affineTraversal)
 import Data.Lens.Index (ix)
 import FRP.Stream as Stream
 import Geometry (Vec2, CanvasMouseEvent)
@@ -67,20 +68,13 @@ type ThumnailData =
     , thumnail :: String
     }
 
-type InitialRule r = 
-    { rule :: NodeGraph.Rule
-    , nextId :: Natural
-    | r }
-
-type InitialState = InitialRule 
-    ( foreignActions :: Stream.Discrete ForeignAction
-    , branchPath :: BranchPath
-    )
+type InitialState = 
+    { foreignActions :: Stream.Discrete ForeignAction
+    }
 
 type EditorState = 
-    { remainingModule :: NodeGraph.Module
-    , rule :: NodeGraph.Rule
-    , rulePath :: BranchPath
+    { module :: NodeGraph.Module
+    , currentRule :: Maybe BranchPath
     , visualRule :: VisualGraph.Rule
     , selection :: Selection
     , hovered :: HoverTarget
@@ -128,7 +122,7 @@ _selectedPin = prism' SelectedPin case _ of
     _ -> Nothing
 
 _module :: Lens' EditorState NodeGraph.Module
-_module = prop (Proxy :: _ "remainingModule")
+_module = prop (Proxy :: _ "module")
 
 _atBranch :: BranchPath -> Lens' EditorState (Maybe NodeGraph.Rule)
 _atBranch path = _module <<< _atHashMap path
@@ -136,31 +130,39 @@ _atBranch path = _module <<< _atHashMap path
 _branch :: BranchPath -> AffineTraversal' EditorState NodeGraph.Rule
 _branch path = _atBranch path <<< _Just
 
-_rule :: Lens' EditorState NodeGraph.Rule
-_rule = prop (Proxy :: _ "rule")
+_rule :: AffineTraversal' EditorState NodeGraph.Rule
+_rule = affineTraversal setter getter
+    where
+    getter state = case state.currentRule of
+        Just path -> note state $ preview (_branch path) state
+        Nothing -> Left state
 
-_ruleConnections :: Lens' EditorState (BiHashMap PinId)
+    setter state rule = case state.currentRule of
+        Just path -> set (_branch path) rule state
+        Nothing -> state
+
+_ruleConnections :: AffineTraversal' EditorState (BiHashMap PinId)
 _ruleConnections = _rule <<< NodeGraph._ruleConnections
 
-_atRuleConnectionPair :: PinId -> Lens EditorState EditorState (HashSet PinId) (Maybe PinId)
+_atRuleConnectionPair :: PinId -> AffineTraversal EditorState EditorState (HashSet PinId) (Maybe PinId)
 _atRuleConnectionPair id = _rule <<< NodeGraph._ruleConnections <<< _atBiHashMap id
 
-_atRuleConnection :: PinId -> PinId -> Lens' EditorState Boolean
+_atRuleConnection :: PinId -> PinId -> AffineTraversal' EditorState Boolean
 _atRuleConnection from to = _rule <<< NodeGraph._ruleConnections <<< _atBiHashMapConnection from to
 
-_ruleBody :: Lens' EditorState (Array NodeId)
+_ruleBody :: AffineTraversal' EditorState (Array NodeId)
 _ruleBody = _rule <<< NodeGraph._ruleBody
 
-_rulePath :: Lens' EditorState BranchPath
-_rulePath = prop (Proxy :: _ "rulePath")
+_currentRule :: Lens' EditorState (Maybe BranchPath)
+_currentRule = prop (Proxy :: _ "currentRule")
 
-_ruleHead :: Lens' EditorState NodeId
+_ruleHead :: AffineTraversal' EditorState NodeId
 _ruleHead = _rule <<< NodeGraph._ruleHead
 
-_ruleNodes :: Lens' EditorState (HashMap NodeId NodeGraph.Node)
+_ruleNodes :: AffineTraversal' EditorState (HashMap NodeId NodeGraph.Node)
 _ruleNodes = _rule <<< NodeGraph._ruleNodes
 
-_atRuleNode :: NodeId -> Lens' EditorState (Maybe NodeGraph.Node)
+_atRuleNode :: NodeId -> AffineTraversal' EditorState (Maybe NodeGraph.Node)
 _atRuleNode nodeId = _ruleNodes <<< _atHashMap nodeId
 
 _ruleNode :: NodeId -> AffineTraversal' EditorState NodeGraph.Node

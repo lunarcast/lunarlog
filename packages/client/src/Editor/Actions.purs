@@ -6,14 +6,15 @@ import Data.Array as Array
 import Data.HashMap as HashMap
 import Data.HashSet as HashSet
 import Data.Vec as Vec
+import Debug (traceM)
 import Geometry (CanvasMouseEvent, Context2D, _position)
 import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
 import Loglude.Data.BiHashMap as BiHashMap
-import Loglude.Run.ExternalState (EXTERNAL_STATE, assign, get, gets, modifying, put, runFocused, use)
+import Loglude.Run.ExternalState (EXTERNAL_STATE, assign, get, gets, modifying, preuse, put, runFocused, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..), PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _hovered, _module, _mousePosition, _nextId, _rule, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _rulePath, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _currentRule, _hovered, _mousePosition, _nextId, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 
 ---------- Types
 type ClientM = TeaM EditorState EditorGeometryId EditorAction
@@ -90,9 +91,9 @@ deletePin (pinId /\ pinNodeId) = do
 -- | Does nothing on head nodes
 deleteNode :: NodeId -> ClientM Boolean
 deleteNode nodeId = do
-    headNode <- use _ruleHead
-    if nodeId /= headNode then do
-        use (_atRuleNode nodeId) >>= traverse_ case _ of
+    headNode <- preuse _ruleHead
+    if Just nodeId /= headNode then do
+        preuse (_ruleNode nodeId) >>= traverse_ case _ of
             NodeGraph.Unify pinId -> deletePin (pinId /\ nodeId)
             NodeGraph.PatternNode { arguments } -> for_ arguments deleteNode
         assign (_atRuleNode nodeId) Nothing
@@ -128,24 +129,16 @@ createNode pattern = do
 
 editBranch :: String /\ Int -> ClientM Unit
 editBranch newPath = do
-    -- Save current branch
-    currentPath <- use _rulePath
-    currentRule <- use _rule
-    assign (_atBranch currentPath) $ Just currentRule
+    assign _currentRule $ Just newPath
 
-    -- Remember the new branch
-    use (_atBranch newPath) >>= traverse_ \rule -> do
-        assign _rule rule
-        assign _rulePath newPath
-
-        assign _selection NoSelection
-        assign _hovered []
+    assign _selection NoSelection
+    assign _hovered []
 
 
 dropPattern :: NodeId -> ClientM Unit
 dropPattern nodeId = do
-    headNode <- use _ruleHead
-    unless (nodeId == headNode) $ use _hovered >>= case _ of
+    headNode <- preuse _ruleHead
+    unless (Just nodeId == headNode) $ use _hovered >>= case _ of
         stack | [NestedPinDropZone id, NodeGeometry pinNodeId, NodeGeometry parent] <- Array.take 3 stack -> do
             deletePin (id /\ pinNodeId)
 

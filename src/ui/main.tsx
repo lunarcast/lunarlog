@@ -72,11 +72,6 @@ interface CreateCompoundProps {
 
 interface EditorProps {
   emit(action: ForeignAction): void;
-  initializeEditor(
-    path: [string, number],
-    name: string,
-    argumentCount: number
-  ): void;
 }
 
 // ========== Constants
@@ -304,7 +299,6 @@ const CreateCompound = ({
 };
 
 export const EditorUi = (props: EditorProps) => {
-  const [initializedPurescript, setInitializedPurescript] = useState(false);
   const [currentBranch, setCurrentBranch] = useState<null | [string, number]>(
     null
   );
@@ -324,17 +318,16 @@ export const EditorUi = (props: EditorProps) => {
 
       const ruleIndex = rules[name].branches.length;
 
-      if (!initializedPurescript) {
+      props.emit({
+        _type: "createBranch",
+        argumentCount: nodes[name],
+        name,
+        index: ruleIndex,
+      });
+
+      if (currentBranch === null) {
         setCurrentBranch([name, ruleIndex]);
-        props.initializeEditor([name, ruleIndex], name, nodes[name]);
-        setInitializedPurescript(true);
-      } else {
-        props.emit({
-          _type: "createBranch",
-          argumentCount: nodes[name],
-          name,
-          index: ruleIndex,
-        });
+        selectBranch(name, ruleIndex);
       }
     },
     [rules]
@@ -381,7 +374,7 @@ export const EditorUi = (props: EditorProps) => {
     [nodes]
   );
 
-  const selectNode = useCallback((name: string, index: number) => {
+  const selectBranch = useCallback((name: string, index: number) => {
     setCurrentBranch([name, index]);
 
     props.emit({
@@ -401,9 +394,9 @@ export const EditorUi = (props: EditorProps) => {
       <RuleList
         selectedBranch={currentBranch}
         createBranch={createBranch}
-        select={selectNode}
+        select={selectBranch}
         edit={(name, index) => {
-          selectNode(name, index);
+          selectBranch(name, index);
           toggleHidden();
         }}
         disabled={Object.entries(rules).length === 0}
