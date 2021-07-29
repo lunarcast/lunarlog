@@ -15,6 +15,7 @@ interface InputProps<T extends keyof InputTypes> {
 interface ButtonProps {
   onClick(): void;
   children: ComponentChildren;
+  disabled?: boolean;
 }
 
 // ========== Components
@@ -42,7 +43,10 @@ export const Input = <T extends keyof InputTypes = "text">(
 
 export const Button = (props: ButtonProps) => {
   return (
-    <button onClick={props.onClick} className="button">
+    <button
+      onClick={props.onClick}
+      className={["button", props.disabled && "button--disabled"].join(" ")}
+    >
       {props.children}
     </button>
   );

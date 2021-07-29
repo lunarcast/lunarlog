@@ -1,7 +1,9 @@
 const esbuild = require("esbuild");
+
 const PurescriptPlugin = require("esbuild-plugin-purescript");
 const alias = require("esbuild-plugin-alias");
 const { sassPlugin } = require("esbuild-sass-plugin");
+const { nearleyPlugin } = require("./build/nearley");
 
 const production = process.env.NODE_ENV === "production";
 const preactCompat = require.resolve("preact/compat");
@@ -15,6 +17,7 @@ esbuild
     watch: true,
     plugins: [
       PurescriptPlugin(),
+      nearleyPlugin(),
       sassPlugin(),
       alias({
         react: preactCompat,

@@ -8,6 +8,9 @@ import { ForeignAction } from "../foreign";
 import { useImmer } from "use-immer";
 import { useKey, useBoolean, useCounter } from "react-use";
 import { Icon } from "./Icon";
+import type { ADT } from "ts-adt";
+import { parsePattern } from "../parser/parser";
+import * as Ast from "../parser/ast";
 
 // ========== Types
 type BranchId = number;
@@ -18,6 +21,15 @@ interface Rule {
 
 type NodeMemory = Record<string, number>;
 type RuleMemory = Record<string, Rule>;
+
+type ParsedQuery = ADT<{
+  success: {
+    result: Ast.Constructor;
+  };
+  failure: {
+    message: string;
+  };
+}>;
 
 interface EditorPaneProps {
   title: string;
@@ -75,6 +87,10 @@ interface CreateCompoundProps {
 
 interface EditorProps {
   emit(action: ForeignAction): void;
+}
+
+interface EditQueryProps {
+  disabled?: boolean;
 }
 
 // ========== Constants
@@ -310,6 +326,63 @@ const CreateCompound = ({
   );
 };
 
+const EditQuery = (props: EditQueryProps) => {
+  const [query, setQuery] = useState("");
+  const [parsingResult, setParsingResult] = useState<ParsedQuery>();
+
+  console.log(parsingResult);
+
+  const updateQuery = (newQuery: string) => {
+    setQuery(newQuery);
+
+    if (newQuery === "") return setParsingResult(undefined);
+
+    try {
+      const result = parsePattern(newQuery);
+
+      setParsingResult({
+        _type: "success",
+        result,
+      });
+    } catch (e) {
+      const message: string = e.message;
+      setParsingResult({
+        _type: "failure",
+        message: message.slice(
+          0,
+          message.indexOf(
+            "Instead, I was expecting to see one of the following"
+          )
+        ),
+      });
+    }
+  };
+
+  return (
+    <EditorPane
+      title="Edit query"
+      disabled={props.disabled ? "Cannot query an empty project" : undefined}
+    >
+      <div className="query">
+        <Input value={query} label="Query" setValue={updateQuery} />
+        {parsingResult?._type === "failure" && (
+          <div className="query__error-message">{parsingResult.message}</div>
+        )}
+
+        <Spacing />
+        <div className="query__evaluate-button-container">
+          <Button
+            disabled={parsingResult?._type !== "success"}
+            onClick={() => {}}
+          >
+            Evaluate
+          </Button>
+        </div>
+      </div>
+    </EditorPane>
+  );
+};
+
 export const EditorUi = (props: EditorProps) => {
   const [currentBranch, setCurrentBranch] = useState<null | [string, number]>(
     null
@@ -446,7 +519,6 @@ export const EditorUi = (props: EditorProps) => {
       />
       <CreateCompound
         disabled={currentBranch === null}
-        allowUpdates
         productName="node"
         isTaken={(name) => Reflect.has(nodes, name)}
         create={createNode}
@@ -456,7 +528,7 @@ export const EditorUi = (props: EditorProps) => {
         disabled={currentBranch === null}
         nodes={[...Object.entries(nodes)]}
       />
-      <div className="editor__pane">7</div>
+      <EditQuery disabled={currentBranch === null} />
       <div className="editor__pane">8</div>
     </div>
   );

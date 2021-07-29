@@ -213,6 +213,32 @@ $ruleBranchRowHeight: 100px;
   }
 }
 
+.query {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.query > .query__error-message {
+  background: $very-dark;
+  color: $error;
+  padding: $spacing;
+  white-space: pre-line;
+}
+
+.query > .query__evaluate-button-container {
+  display: flex;
+  justify-content: flex-end;
+  flex-direction: row;
+
+  width: 100%;
+  padding: $spacing;
+
+  .button:not(.button--disabled) {
+    cursor: pointer;
+  }
+}
+
 // ========== Media queries
 @media only screen and (max-width: 1000px) {
   #editor {
