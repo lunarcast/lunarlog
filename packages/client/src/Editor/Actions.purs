@@ -13,7 +13,7 @@ import Loglude.Run.ExternalState (EXTERNAL_STATE, assign, get, gets, modifying, 
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..), PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _currentRule, _hovered, _mousePosition, _nextId, _pointerEventsEnabled, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), BranchPath, _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _currentRule, _hovered, _mousePosition, _nextId, _pointerEventsEnabled, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 import Prelude (when)
 
 ---------- Types
@@ -86,6 +86,10 @@ deletePin :: PinId /\ NodeId -> ClientM Unit
 deletePin (pinId /\ pinNodeId) = do
     assign (_atRuleNode pinNodeId) Nothing
     assign (_atRuleConnectionPair pinId) Nothing
+
+-- | Delete the data about one branch from the editor
+deleteBranch :: BranchPath -> ClientM Unit
+deleteBranch path = assign (_atBranch path) Nothing
 
 -- | Remove all data about a node from the state. 
 -- | Does nothing on head nodes

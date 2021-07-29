@@ -6,14 +6,14 @@ import { Spacing } from "./Spacing";
 import { capitalize, capitalizeWord } from "./helpers";
 import { ForeignAction } from "../foreign";
 import { useImmer } from "use-immer";
-import { useKey, useBoolean } from "react-use";
+import { useKey, useBoolean, useCounter } from "react-use";
 import { Icon } from "./Icon";
 
 // ========== Types
-interface RuleBranch {}
+type BranchId = number;
 
 interface Rule {
-  branches: Array<RuleBranch>;
+  branches: Array<BranchId>;
 }
 
 type NodeMemory = Record<string, number>;
@@ -42,17 +42,19 @@ interface RuleListProps {
   disabled?: boolean;
   selectedBranch: null | [string, number];
   createBranch(name: string): void;
-  select(name: string, index: number): void;
-  edit(name: string, index: number): void;
+  select(name: string, branchId: number): void;
+  edit(name: string, branchId: number): void;
+  delete(name: string, branchId: number): void;
 }
 
 interface BranchListProps {
-  branches: Array<RuleBranch>;
+  branches: Array<BranchId>;
   name: string;
   selectedBranch: null | number;
   createBranch(): void;
-  select(index: number): void;
-  edit(index: number): void;
+  select(branchId: number): void;
+  edit(branchId: number): void;
+  delete(branchId: number): void;
 }
 
 interface RuleBranchProps {
@@ -60,6 +62,7 @@ interface RuleBranchProps {
   isSelected: boolean;
   select(): void;
   edit(): void;
+  delete(): void;
 }
 
 interface CreateCompoundProps {
@@ -152,7 +155,12 @@ const NodeList = ({ nodes, disabled, use }: NodeListProps) => {
 };
 
 // The preview for a rule
-const RuleBranch = ({ edit, select, isSelected }: RuleBranchProps) => {
+const RuleBranch = ({
+  edit,
+  select,
+  delete: deleteBranch,
+  isSelected,
+}: RuleBranchProps) => {
   return (
     <div
       className={["rule__branch", isSelected && "rule__branch--selected"].join(
@@ -161,7 +169,7 @@ const RuleBranch = ({ edit, select, isSelected }: RuleBranchProps) => {
       onClick={select}
     >
       <Icon onClick={edit}>edit</Icon>
-      <Icon>delete</Icon>
+      <Icon onClick={deleteBranch}>delete</Icon>
     </div>
   );
 };
@@ -172,6 +180,7 @@ const BranchList = ({
   name,
   createBranch,
   selectedBranch,
+  delete: deleteBranch,
   edit,
   select,
 }: BranchListProps) => {
@@ -179,13 +188,14 @@ const BranchList = ({
     <div className="rule">
       <div className="rule__name">{capitalizeWord(name)}</div>
       <div className="rule__branches">
-        {branches.map((_, index) => (
+        {branches.map((branchId) => (
           <RuleBranch
-            isSelected={index === selectedBranch}
+            isSelected={branchId === selectedBranch}
             name={name}
-            key={index}
-            select={() => select(index)}
-            edit={() => edit(index)}
+            key={branchId}
+            select={() => select(branchId)}
+            edit={() => edit(branchId)}
+            delete={() => deleteBranch(branchId)}
           />
         ))}
         <Button onClick={createBranch}>
@@ -203,6 +213,7 @@ const RuleList = ({
   selectedBranch,
   edit,
   select,
+  delete: deleteBranch,
 }: RuleListProps) => {
   return (
     <EditorPane
@@ -218,8 +229,9 @@ const RuleList = ({
           name={name}
           key={name}
           branches={branches.branches}
-          edit={(index) => edit(name, index)}
-          select={(index) => select(name, index)}
+          edit={(branchId) => edit(name, branchId)}
+          select={(branchId) => select(name, branchId)}
+          delete={(branchId) => deleteBranch(name, branchId)}
         />
       ))}
     </EditorPane>
@@ -305,29 +317,35 @@ export const EditorUi = (props: EditorProps) => {
 
   const [nodes, setNodes] = useImmer<NodeMemory>({});
   const [rules, setRules] = useImmer<RuleMemory>({});
+  const [currentId, incrementId] = useState(0);
 
   const [isHidden, toggleHidden] = useBoolean(false);
+
+  const generateId = () => {
+    incrementId((old) => old + 1);
+    return currentId;
+  };
 
   const createBranch = useCallback(
     (name: string) => {
       if (!Reflect.has(rules, name)) return;
 
-      setRules((draft: RuleMemory) => {
-        draft[name].branches.push({});
-      });
+      let ruleId = generateId();
 
-      const ruleIndex = rules[name].branches.length;
+      setRules((draft: RuleMemory) => {
+        draft[name].branches.push(ruleId);
+      });
 
       props.emit({
         _type: "createBranch",
         argumentCount: nodes[name],
         name,
-        index: ruleIndex,
+        branchId: ruleId,
       });
 
       if (currentBranch === null) {
-        setCurrentBranch([name, ruleIndex]);
-        selectBranch(name, ruleIndex);
+        setCurrentBranch([name, ruleId]);
+        selectBranch(name, ruleId);
       }
     },
     [rules]
@@ -351,8 +369,8 @@ export const EditorUi = (props: EditorProps) => {
     "s",
     (e) => {
       if (e.target instanceof HTMLInputElement) return;
-
       if (currentBranch === null) return;
+
       toggleHidden();
       props.emit({
         _type: "togglePointerEvents",
@@ -383,7 +401,21 @@ export const EditorUi = (props: EditorProps) => {
 
     props.emit({
       _type: "editBranch",
-      index,
+      branchId: index,
+      name,
+    });
+  }, []);
+
+  const deleteBranch = useCallback((name: string, branchId: BranchId) => {
+    setRules((draft: RuleMemory) => {
+      const rule = draft[name].branches;
+
+      rule.splice(rule.indexOf(branchId), 1);
+    });
+
+    props.emit({
+      _type: "deleteBranch",
+      branchId,
       name,
     });
   }, []);
@@ -399,9 +431,15 @@ export const EditorUi = (props: EditorProps) => {
         selectedBranch={currentBranch}
         createBranch={createBranch}
         select={selectBranch}
+        delete={deleteBranch}
         edit={(name, index) => {
           selectBranch(name, index);
           toggleHidden();
+
+          props.emit({
+            _type: "togglePointerEvents",
+            shouldGetEnabled: !isHidden,
+          });
         }}
         disabled={Object.entries(rules).length === 0}
         rules={rules}

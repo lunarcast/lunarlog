@@ -19,11 +19,12 @@ interface ForeignConstructors<T> {
   createRule(name: string): T;
   createBranch(
     name: string,
-    index: number,
+    branchId: number,
     pattern: { name: string; argumentCount: number }
   ): T;
   addNode(name: string, argCount: number): T;
-  editBranch(name: string, index: number): T;
+  editBranch(name: string, branchId: number): T;
+  deleteBranch(name: string, branchId: number): T;
   togglePointerEvents(shouldGetEnabled: boolean): T;
 }
 
@@ -33,11 +34,15 @@ export type ForeignAction = ADT<{
   createBranch: {
     name: string;
     argumentCount: number;
-    index: number;
+    branchId: number;
   };
   editBranch: {
     name: string;
-    index: number;
+    branchId: number;
+  };
+  deleteBranch: {
+    name: string;
+    branchId: number;
   };
   addNode: {
     name: string;
@@ -66,14 +71,16 @@ export const main = (stream: Stream<ForeignAction>) =>
       stream((tsAction) =>
         emit(
           matchI(tsAction)({
-            createBranch: ({ name, argumentCount, index }) =>
+            createBranch: ({ name, argumentCount, branchId: index }) =>
               constructors.createBranch(name, index, { name, argumentCount }),
-            editBranch: ({ name, index }) =>
+            editBranch: ({ name, branchId: index }) =>
               constructors.editBranch(name, index),
             addNode: ({ name, argumentCount }) =>
               constructors.addNode(name, argumentCount),
             togglePointerEvents: ({ shouldGetEnabled }) =>
               constructors.togglePointerEvents(shouldGetEnabled),
+            deleteBranch: ({ name, branchId }) =>
+              constructors.deleteBranch(name, branchId),
           })
         )()
       ),

@@ -18,6 +18,7 @@ type Constructors a =
     { createBranch :: Fn3 String Int PatternShape a
     , addNode :: Fn2 String Int a
     , editBranch :: Fn2 String Int a
+    , deleteBranch :: Fn2 String Int a
     , togglePointerEvents :: Boolean -> a
     }
 
@@ -37,6 +38,7 @@ constructors :: Constructors ForeignAction
 constructors =
     { createBranch: mkFn3 $ curry CreateBranch
     , editBranch: mkFn2 EditBranch
+    , deleteBranch: mkFn2 DeleteBranch
     , addNode: mkFn2 AddNode
     , togglePointerEvents: TogglePointerEvents
     }

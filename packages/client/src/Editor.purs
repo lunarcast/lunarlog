@@ -24,7 +24,7 @@ import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Data.Lens (_atHashMap)
-import Loglude.Editor.Actions (createBranch, createNode, deleteConnection, deleteNode, dropPattern, editBranch, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered, usesPointerEvents)
+import Loglude.Editor.Actions (createBranch, createNode, deleteBranch, deleteConnection, deleteNode, dropPattern, editBranch, rememberMousePosition, selectNestedNode, selectNode, selectPin, updateHovered, usesPointerEvents)
 import Loglude.Editor.Components.Connection (connection)
 import Loglude.Editor.Settings (hoveredConnectionWeight)
 import Loglude.Run.ExternalState (assign, get, modifying, use)
@@ -69,7 +69,8 @@ scene initial =
     handleAction = case _ of
         ForeignAction (CreateBranch path pattern) -> createBranch path pattern
         ForeignAction (AddNode name argumentCount) -> createNode { name, argumentCount }
-        ForeignAction (EditBranch name index) -> editBranch (name /\ index)
+        ForeignAction (EditBranch name id) -> editBranch (name /\ id)
+        ForeignAction (DeleteBranch name id) -> deleteBranch (name /\ id)
         ForeignAction (TogglePointerEvents shouldGetEnabled) -> assign _pointerEventsEnabled shouldGetEnabled
         KeyboardAction DeleteKey -> usesPointerEvents do
             use _selection >>= case _ of

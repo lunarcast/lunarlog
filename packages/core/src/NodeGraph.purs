@@ -4,7 +4,6 @@ import Loglude
 
 import Loglude.Data.BiHashMap (BiHashMap)
 
-
 newtype NodeId = NodeId Int
 newtype PinId = PinId Int
 

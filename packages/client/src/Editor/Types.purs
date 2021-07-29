@@ -38,6 +38,7 @@ type BranchPath = String /\ Int
 data ForeignAction
     = CreateBranch BranchPath PatternShape
     | EditBranch String Int
+    | DeleteBranch String Int
     | AddNode String Int
     | TogglePointerEvents Boolean
 
