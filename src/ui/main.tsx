@@ -112,6 +112,14 @@ interface QueryResultProps {
 }
 
 // ========== Constants
+const standardLibrary: NodeMemory = {
+  Z: 0,
+  S: 1,
+  Nil: 0,
+  Cons: 2,
+  Pair: 2,
+};
+
 const nodeAdjective = [
   "interesting",
   "intriguing",
@@ -475,7 +483,10 @@ const InfoPanel = () => {
         <div className="info__card" id="info-card-tutorial">
           <Icon className="info__card-icon">help</Icon>
           Read{" "}
-          <a target="_blank" href="https://github.com/lunarcast/lunarlog">
+          <a
+            target="_blank"
+            href="https://github.com/lunarcast/lunarlog/blob/develop/docs/tutorial.md"
+          >
             the tutorial
           </a>
         </div>
@@ -489,7 +500,7 @@ export const EditorUi = (props: EditorProps) => {
     null
   );
 
-  const [nodes, setNodes] = useImmer<NodeMemory>({});
+  const [nodes, setNodes] = useImmer<NodeMemory>(standardLibrary);
   const [rules, setRules] = useImmer<RuleMemory>({});
   const [currentId, incrementId] = useState(0);
 

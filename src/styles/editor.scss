@@ -117,6 +117,7 @@
 #node-list > .node {
   @include dropShadow();
   padding: $spacing;
+  margin: $spacing;
   background: $primary;
 
   display: flex;
