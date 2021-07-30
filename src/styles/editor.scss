@@ -269,6 +269,41 @@ $ruleBranchRowHeight: 100px;
   }
 }
 
+#info {
+  padding: $spacing;
+
+  display: flex;
+  flex-direction: column;
+}
+
+#info > .info__card {
+  @include dropShadow();
+
+  margin-top: $spacing;
+  padding: $spacing;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+
+  a {
+    color: $blue;
+    border: none;
+    text-decoration: none;
+    margin-left: 0.4rem;
+  }
+}
+
+#info > .info__card > .info__card-icon {
+  margin-right: math.div($spacing, 2);
+  font-size: 1.2rem;
+}
+
+#info > .info__card > #info__github-logo {
+  height: 1.2rem;
+}
+
 // ========== Media queries
 @media only screen and (max-width: 1000px) {
   #editor {

@@ -30,6 +30,7 @@ esbuild
     inject: ["./src/preact-shim.ts"],
     loader: {
       ".svg": "file",
+      ".png": "file",
     },
   })
   .catch((_e) => process.exit(1));

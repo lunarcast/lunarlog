@@ -429,6 +429,33 @@ const EditQuery = (props: EditQueryProps) => {
   );
 };
 
+const InfoPanel = () => {
+  return (
+    <EditorPane title="Info">
+      <div id="info">
+        <div className="info__card" id="info-card-github">
+          <img
+            className="info__card-icon"
+            id="info__github-logo"
+            src={require("../../public/assets/github.png")}
+          />
+          Check it out on{" "}
+          <a target="_blank" href="https://github.com/lunarcast/lunarlog">
+            github
+          </a>
+        </div>
+        <div className="info__card" id="info-card-tutorial">
+          <Icon className="info__card-icon">help</Icon>
+          Read{" "}
+          <a target="_blank" href="https://github.com/lunarcast/lunarlog">
+            the tutorial
+          </a>
+        </div>
+      </div>
+    </EditorPane>
+  );
+};
+
 export const EditorUi = (props: EditorProps) => {
   const [currentBranch, setCurrentBranch] = useState<null | [string, number]>(
     null
@@ -579,7 +606,7 @@ export const EditorUi = (props: EditorProps) => {
         queryResults={props.queryResults}
         evaluate={(query) => props.emit({ _type: "evaluateQuery", query })}
       />
-      <div className="editor__pane">8</div>
+      <InfoPanel />
     </div>
   );
 };
