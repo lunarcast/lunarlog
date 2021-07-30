@@ -1,5 +1,6 @@
 import "../styles/editor.scss";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useContext } from "preact/hooks";
+import { createContext } from "preact";
 import { Button, Input } from "./Input";
 import { ComponentChild } from "preact";
 import { Spacing } from "./Spacing";
@@ -13,6 +14,7 @@ import { parsePattern } from "../parser/parser";
 import * as Ast from "../parser/ast";
 import { Stream, useStream } from "../Stream";
 import { div } from "@thi.ng/matrices";
+import { CompoundName, dutch, english } from "../internalization/Language";
 
 // ========== Types
 type BranchId = number;
@@ -91,7 +93,7 @@ interface RuleBranchProps {
 interface CreateCompoundProps {
   isTaken(name: string): boolean;
   create(name: string, argumentCount: number): void;
-  productName: string;
+  productName: CompoundName;
   allowUpdates?: boolean;
   disabled?: boolean;
 }
@@ -99,6 +101,7 @@ interface CreateCompoundProps {
 interface EditorProps {
   emit(action: ForeignAction): void;
   queryResults: Stream<Array<Substitution> | null>;
+  nextLanguage: () => void;
 }
 
 interface EditQueryProps {
@@ -111,6 +114,10 @@ interface QueryResultProps {
   substitutions: Array<Substitution>;
 }
 
+interface InfoProps {
+  nextLanguage: () => void;
+}
+
 // ========== Constants
 const standardLibrary: NodeMemory = {
   Z: 0,
@@ -120,18 +127,16 @@ const standardLibrary: NodeMemory = {
   Pair: 2,
 };
 
-const nodeAdjective = [
-  "interesting",
-  "intriguing",
-  "aweomse",
-  "favorite",
-  "cool",
-  "important",
-  "special",
-  "unique",
-  "original",
-  "creative",
-];
+export const languages = [english, dutch];
+
+// ========== Contexts
+export const languageContext = createContext(0);
+
+const useLanguage = () => {
+  const index = useContext(languageContext);
+
+  return languages[index];
+};
 
 // ========== Components
 const EditorPane = ({ children, title, disabled }: EditorPaneProps) => {
@@ -165,21 +170,23 @@ const Node = ({ argumentCount, name, use }: NodeProps) => {
 };
 
 const EmptyNodeList = () => {
+  const language = useLanguage();
+
   return (
     <div className="editor__pane-empty-node-list">
-      <p>You haven't created any node yet!</p>
+      <p>{language.noNodes}</p>
     </div>
   );
 };
 
 // The node list panel
 const NodeList = ({ nodes, disabled, use }: NodeListProps) => {
+  const language = useLanguage();
+
   return (
     <EditorPane
-      title="Use node"
-      disabled={
-        disabled ? "Cannot use nodes without creating a rule first" : undefined
-      }
+      title={language.tabs.useNode}
+      disabled={disabled ? language.cannotUseNodeWihtoutRule : undefined}
     >
       <div id="node-list">
         {nodes.map(([name, argumentCount]) => (
@@ -257,10 +264,11 @@ const RuleList = ({
   select,
   delete: deleteBranch,
 }: RuleListProps) => {
+  const language = useLanguage();
   return (
     <EditorPane
-      title="Rules"
-      disabled={disabled ? "No rules found" : undefined}
+      title={language.tabs.rules}
+      disabled={disabled ? language.noRulesFound : undefined}
     >
       {Object.entries(rules).map(([name, branches]) => (
         <BranchList
@@ -288,46 +296,50 @@ const CreateCompound = ({
   allowUpdates,
   disabled,
 }: CreateCompoundProps) => {
+  const language = useLanguage();
   const [name, setName] = useState("");
   const [argCount, setArgCount] = useState(2);
   let error: null | string = null;
 
   if (isTaken(name) && !allowUpdates) {
-    error = `Name "${name}" is already taken`;
+    error = language.nameTaken(name);
   }
 
   const resetInputs = () => {
     const adjective =
-      nodeAdjective[Math.floor(Math.random() * nodeAdjective.length)];
-    setName(`My ${adjective} ${productName}`);
-    setArgCount(2);
+      language.adjectives[
+        Math.floor(Math.random() * language.adjectives.length)
+      ];
+    setName(
+      language.myCompound(
+        `${capitalizeWord(adjective)}${capitalizeWord(language[productName])}`
+      )
+    );
   };
 
   useEffect(() => {
     resetInputs();
   }, []);
 
-  const action = allowUpdates && isTaken(name) ? "Update" : "Create";
-
   return (
     <EditorPane
-      title={`Create ${productName}`}
-      disabled={
-        disabled
-          ? "Cannot create nodes without creating a rule first"
-          : undefined
+      title={
+        productName === "node"
+          ? language.tabs.createNode
+          : language.tabs.createRule
       }
+      disabled={disabled ? language.cannotCreateNodeWithoutRule : undefined}
     >
       <div id="create-node">
         <Input
           value={name}
-          label={`${capitalize(productName)} name`}
+          label={language.nameCompound[productName]}
           setValue={setName}
         />
         <Input
           type="number"
           value={argCount}
-          label="Argument count"
+          label={language.argumentCount}
           setValue={(c) => setArgCount(Math.max(0, Math.floor(c)))}
         />
 
@@ -345,7 +357,7 @@ const CreateCompound = ({
               }
             }}
           >
-            {action} {productName}
+            {language.createCompound[productName]}
           </Button>
         </div>
       </div>
@@ -354,10 +366,11 @@ const CreateCompound = ({
 };
 
 const QueryResult = (props: QueryResultProps) => {
+  const language = useLanguage();
   if (props.substitutions.length === 0) {
     return (
       <div className="query__result-container">
-        <div className="query__no-solution">No solutions found</div>
+        <div className="query__no-solution">{language.noSolutions}</div>
       </div>
     );
   }
@@ -381,6 +394,7 @@ const QueryResult = (props: QueryResultProps) => {
 };
 
 const EditQuery = (props: EditQueryProps) => {
+  const language = useLanguage();
   const [query, setQuery] = useState("");
   const [parsingResult, setParsingResult] = useState<ParsedQuery>();
   const [currentResult, setCurrentResult] = useState<null | QueryResult>(null);
@@ -389,8 +403,7 @@ const EditQuery = (props: EditQueryProps) => {
     if (result === null) {
       setCurrentResult({
         _type: "failure",
-        message:
-          "Couldn't solve constraint, possibly infinite recursion encountered",
+        message: language.infiniteRecursion,
       });
     } else
       setCurrentResult({
@@ -430,8 +443,8 @@ const EditQuery = (props: EditQueryProps) => {
 
   return (
     <EditorPane
-      title="Edit query"
-      disabled={props.disabled ? "Cannot query an empty project" : undefined}
+      title={language.tabs.editQuery}
+      disabled={props.disabled ? language.cannotQueryWithoutRule : undefined}
     >
       <div className="query">
         <Input value={query} label="Query" setValue={updateQuery} />
@@ -465,9 +478,10 @@ const EditQuery = (props: EditQueryProps) => {
   );
 };
 
-const InfoPanel = () => {
+const InfoPanel = (props: InfoProps) => {
+  const language = useLanguage();
   return (
-    <EditorPane title="Info">
+    <EditorPane title={language.tabs.info}>
       <div id="info">
         <div className="info__card" id="info-card-github">
           <img
@@ -475,21 +489,23 @@ const InfoPanel = () => {
             id="info__github-logo"
             src={require("../../public/assets/github.png")}
           />
-          Check it out on{" "}
+          {language.checkItOutOnGithhub[0]}
           <a target="_blank" href="https://github.com/lunarcast/lunarlog">
-            github
+            {language.checkItOutOnGithhub[1]}
           </a>
         </div>
         <div className="info__card" id="info-card-tutorial">
           <Icon className="info__card-icon">help</Icon>
-          Read{" "}
+          {language.readTheTutorial[0]}
           <a
             target="_blank"
             href="https://github.com/lunarcast/lunarlog/blob/develop/docs/tutorial.md"
           >
-            the tutorial
+            {language.readTheTutorial[1]}
           </a>
         </div>
+        <Spacing />
+        <Button onClick={props.nextLanguage}>{language.language}</Button>
       </div>
     </EditorPane>
   );
@@ -645,7 +661,7 @@ export const EditorUi = (props: EditorProps) => {
         queryResults={props.queryResults}
         evaluate={(query) => props.emit({ _type: "evaluateQuery", query })}
       />
-      <InfoPanel />
+      <InfoPanel nextLanguage={props.nextLanguage} />
     </div>
   );
 };
