@@ -207,7 +207,8 @@ selectNestedNode { parent, nodeId } = do
 
         -- Move the resized pattern to look "good" relative to the mouse
         absoluteBounds (NodeGeometry nodeId) >>= traverse_ \bounds' -> do
-            mousePosition <- use _mousePosition
+            camera <- use _camera
+            mousePosition <- use _mousePosition <#> Transform.multiplyVector (Transform.inverse camera)
             let relativeMousePosition = mousePosition - bounds.position
 
             -- size' * mouse / size
