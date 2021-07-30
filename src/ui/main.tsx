@@ -12,6 +12,7 @@ import type { ADT } from "ts-adt";
 import { parsePattern } from "../parser/parser";
 import * as Ast from "../parser/ast";
 import { Stream, useStream } from "../Stream";
+import { div } from "@thi.ng/matrices";
 
 // ========== Types
 type BranchId = number;
@@ -336,6 +337,14 @@ const CreateCompound = ({
 };
 
 const QueryResult = (props: QueryResultProps) => {
+  if (props.substitutions.length === 0) {
+    return (
+      <div className="query__result-container">
+        <div className="query__no-solution">No solutions found</div>
+      </div>
+    );
+  }
+
   return (
     <div className="query__result-container">
       <div class="query__result-row">
@@ -358,13 +367,7 @@ const EditQuery = (props: EditQueryProps) => {
   const [query, setQuery] = useState("");
   const [parsingResult, setParsingResult] = useState<ParsedQuery>();
   const [currentResult, setCurrentResult] =
-    useState<null | Array<Substitution>>([
-      [
-        { name: "a", solution: "-" },
-        { name: "b", solution: "a" },
-        { name: "c", solution: "a" },
-      ],
-    ]);
+    useState<null | Array<Substitution>>(null);
 
   useStream(props.queryResults, setCurrentResult);
 

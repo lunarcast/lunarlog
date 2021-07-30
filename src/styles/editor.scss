@@ -251,6 +251,11 @@ $ruleBranchRowHeight: 100px;
   }
 }
 
+.query > .query__result-container > .query__no-solution {
+  text-align: center;
+  color: $on-dark-pale;
+}
+
 .query > .query__evaluate-button-container {
   display: flex;
   justify-content: flex-end;
