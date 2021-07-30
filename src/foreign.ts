@@ -32,7 +32,7 @@ export type Substitution = Array<{
 }>;
 
 export interface ForeignArguments {
-  queryResults: ForeignStream<Array<Substitution>>;
+  queryResults: ForeignStream<Array<Substitution> | null>;
 }
 
 export type ForeignAction = ADT<{

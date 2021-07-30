@@ -6,6 +6,8 @@ module Main
 import Loglude
 
 import Data.Function.Uncurried (Fn2, Fn3, mkFn2, mkFn3)
+import Data.Nullable (Nullable)
+import Data.Nullable as Nullable
 import FRP.Stream as Stream
 import Geometry (launchTea)
 import Graphics.Canvas (getCanvasElementById, getContext2D)
@@ -25,7 +27,7 @@ type Constructors a =
     }
 
 type Result = 
-    { queryResults :: Stream.Discrete (Array ForeignSubstitution)
+    { queryResults :: Stream.Discrete (Nullable (Array ForeignSubstitution))
     }
 
 type ForeignInput a =
@@ -62,5 +64,5 @@ mainImpl input = do
                 }
     
     pure 
-        { queryResults: queryResults.event
+        { queryResults: queryResults.event <#> Nullable.toNullable
         }

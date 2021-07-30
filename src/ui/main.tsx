@@ -33,6 +33,15 @@ type ParsedQuery = ADT<{
   };
 }>;
 
+type QueryResult = ADT<{
+  success: {
+    result: Array<Substitution>;
+  };
+  failure: {
+    message: string;
+  };
+}>;
+
 interface EditorPaneProps {
   title: string;
   disabled?: string;
@@ -89,12 +98,12 @@ interface CreateCompoundProps {
 
 interface EditorProps {
   emit(action: ForeignAction): void;
-  queryResults: Stream<Array<Substitution>>;
+  queryResults: Stream<Array<Substitution> | null>;
 }
 
 interface EditQueryProps {
   disabled?: boolean;
-  queryResults: Stream<Array<Substitution>>;
+  queryResults: Stream<Array<Substitution> | null>;
   evaluate(query: Ast.Constructor): void;
 }
 
@@ -366,10 +375,21 @@ const QueryResult = (props: QueryResultProps) => {
 const EditQuery = (props: EditQueryProps) => {
   const [query, setQuery] = useState("");
   const [parsingResult, setParsingResult] = useState<ParsedQuery>();
-  const [currentResult, setCurrentResult] =
-    useState<null | Array<Substitution>>(null);
+  const [currentResult, setCurrentResult] = useState<null | QueryResult>(null);
 
-  useStream(props.queryResults, setCurrentResult);
+  useStream(props.queryResults, (result) => {
+    if (result === null) {
+      setCurrentResult({
+        _type: "failure",
+        message:
+          "Couldn't solve constraint, possibly infinite recursion encountered",
+      });
+    } else
+      setCurrentResult({
+        _type: "success",
+        result,
+      });
+  });
 
   const updateQuery = (newQuery: string) => {
     setQuery(newQuery);
@@ -403,14 +423,22 @@ const EditQuery = (props: EditQueryProps) => {
   return (
     <EditorPane
       title="Edit query"
-      //disabled={props.disabled ? "Cannot query an empty project" : undefined}
+      disabled={props.disabled ? "Cannot query an empty project" : undefined}
     >
       <div className="query">
         <Input value={query} label="Query" setValue={updateQuery} />
         {parsingResult?._type === "failure" && (
           <div className="query__error-message">{parsingResult.message}</div>
         )}
-        {currentResult && <QueryResult substitutions={currentResult} />}
+        {currentResult?._type === "success" && (
+          <QueryResult substitutions={currentResult.result} />
+        )}
+        {currentResult?._type === "failure" && (
+          <div className="query__result-container">
+            <div className="query__no-solution">{currentResult.message}</div>
+          </div>
+        )}
+
         <Spacing />
         <div className="query__evaluate-button-container">
           <Button

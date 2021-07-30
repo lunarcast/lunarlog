@@ -66,16 +66,10 @@ type PatternShape =
     , name :: String
     }
 
-type ThumnailData =
-    { name :: String
-    , index :: Int
-    , thumnail :: String
-    }
-
 type ForeignSubstitution = Array { name :: String, solution :: String }
 type InitialState = 
     { foreignActions :: Stream.Discrete ForeignAction
-    , emitQueryResult :: Array ForeignSubstitution -> Effect Unit 
+    , emitQueryResult :: Maybe (Array ForeignSubstitution) -> Effect Unit 
     }
 
 type EditorState = 

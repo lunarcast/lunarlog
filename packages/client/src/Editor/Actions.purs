@@ -19,9 +19,11 @@ import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), Ed
 import Lunarlog.Expression (freeVarsConstructor)
 import Lunarlog.Expression as Expression
 import Lunarlog.Parser.Cst as Cst
+import Lunarlog.Search.Naive (runDepth)
 import Lunarlog.Search.Naive as Search
 import Prelude (when)
 import Run (extract)
+import Run.Except (runFail)
 import Run.Reader (runReader)
 import Run.Supply (runSupply)
 
@@ -217,7 +219,7 @@ selectNestedNode { parent, nodeId } = do
 
             assign (_visualRuleNode nodeId <<< VisualGraph._patternNode <<< _position) newPosition
 
-evaluateQuery :: Cst.Pattern -> ClientM (Array ForeignSubstitution)
+evaluateQuery :: Cst.Pattern -> ClientM (Maybe (Array ForeignSubstitution))
 evaluateQuery cst = ado
     module_ <- use _module
     let context 
@@ -231,9 +233,11 @@ evaluateQuery cst = ado
           = Search.solve [goal]
           # runSupply ((+) 1) 0
           # runReader context
+          # runDepth 100
+          # runFail
           # extract
     in solutions
-        <#> \solution -> freeVarsConstructor goal
+        <#> map \solution -> freeVarsConstructor goal
             # Array.fromFoldable
             <#> \var -> 
                 { name: var

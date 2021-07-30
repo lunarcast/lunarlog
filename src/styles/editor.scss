@@ -320,6 +320,7 @@ $ruleBranchRowHeight: 100px;
   #editor {
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
   }
 
   #editor > .editor__pane {
