@@ -170,11 +170,19 @@ instance Foldable Expression where
 
 instance Show (Expression String) where
     show (Var name) = name
+    show constructor@(Constructor _) | Just natural <- extractNatural constructor = show natural
     show (Constructor { name, arguments }) = joinWith " "
         $ Array.cons name $ printArgument <$> arguments
         where
+        printArgument constructor@(Constructor _) | Just natural <- extractNatural constructor = show natural 
         printArgument argument@(Constructor { arguments }) | not (Array.null arguments) = "(" <> show argument <> ")"
         printArgument other = show other
+
+extractNatural :: forall a. Expression a -> Maybe Int
+extractNatural (Constructor { arguments: [previous], name: "S" }) = ((+) 1) <$> extractNatural previous
+extractNatural (Constructor { arguments: [], name: "Z" }) = Just 0
+extractNatural _ = Nothing
+
 
 instance Traversable Expression where
     traverse f (Var v) = f v <#> Var
