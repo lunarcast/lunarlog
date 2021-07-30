@@ -9,17 +9,19 @@ import Data.Array.NonEmpty as NonEmptyArray
 import Data.Compactable (compact)
 import Data.HashMap as HashMap
 import Data.Lens.Index (ix)
-import Data.MouseButton (nothingPressed)
+import Data.MouseButton (isPressed, leftButton, nothingPressed)
 import Data.Traversable (sequence)
 import Data.Undefined.NoProblem as Opt
 import Effect.Aff (launchAff_)
 import FRP.Stream (previewMap)
 import FRP.Stream as Stream
 import Geoemtry.Data.AABB as AABB
-import Geometry (Geometry, MultiStepRenderer, Tea, Vec2, ReporterOutput, _position, x)
+import Geometry (Geometry, MultiStepRenderer, ReporterOutput, Tea, Vec2, _position, x)
 import Geometry as Geometry
 import Geometry.Base (mapAction)
 import Geometry.Tea (TeaM, createMouseEvent, eventStream, stopPropagation)
+import Geometry.Transform as Transform
+import Geometry.Transform as Transofmr
 import Graphics.Canvas (Context2D)
 import Loglude.Cancelable as Cancelable
 import Loglude.Data.BiHashMap as BiHashMap
@@ -32,7 +34,7 @@ import Lunarlog.Client.VisualGraph.Render (renderPattern)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, ForeignAction(..), InitialState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _pointerEventsEnabled, _rule, _ruleConnections, _ruleHead, _ruleNode, _selectedNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
+import Lunarlog.Editor.Types (EditorAction(..), EditorGeometryId(..), EditorState, ForeignAction(..), InitialState, KeyboardAction(..), PatternAction(..), PinSide(..), Selection(..), _camera, _hovered, _hoveredConnection, _mousePosition, _nestedPinDropZone, _pointerEventsEnabled, _rule, _ruleConnections, _ruleHead, _ruleNode, _selectedPin, _selection, _visualRule, _visualRuleNode)
 import Prelude (const, when, zero)
 import Web.Event.Event (EventType(..))
 import Web.UIEvent.KeyboardEvent as KeyboardEvent
@@ -51,6 +53,7 @@ scene initial =
         , nextId: zero
         , currentRule: Nothing
         , pointerEventsEnabled: false
+        , camera: Transform.identityMatrix
         }
     , render
     , handleAction
@@ -116,18 +119,25 @@ scene initial =
             handleAction $ RefreshSelection event
             updateHovered
 
-            get <#> preview (_selection <<< _selectedNode) >>= traverse_ \id -> do
-                    let delta = event.worldPosition - oldPosition
+            let delta = event.worldPosition - oldPosition
+
+            use _selection >>= case _ of
+                SelectedNode id -> do
                     modifying (_visualRule <<< VisualGraph._ruleNodes <<< _atHashMap id <<< _Just <<< VisualGraph._patternNode <<< _position) ((+) delta)
+                NoSelection | isPressed event.buttons leftButton -> do
+                    let diff = Transofmr.translate delta
+                    modifying _camera (_ <> diff)
+                _ -> pure unit
 
     render :: Stream.Discrete EditorState -> Stream.Discrete (MultiStepRenderer _ _)
     render state = state <#> preview _rule <#> isJust # Aged.dropDuplicates # flip Stream.bind case _ of
         false -> pure $ (0 /\ Geometry.None zero) /\ []
         true -> ado
+            camera <- state <#> _.camera # Aged.dropDuplicates
             step1 <- step1 state
             step2 <- connections state
             step3 <- connectionPreview state
-            in (1 /\ step1) /\ 
+            in (1 /\ Geometry.transform { transform: camera, target: step1 }) /\ 
                 [ step2 >>> Tuple 0
                 , step3 >>> Tuple 2
                 ]

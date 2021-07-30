@@ -7,7 +7,7 @@ import Data.Array.NonEmpty as NonEmptyArray
 import Data.Lens.AffineTraversal (affineTraversal)
 import Data.Lens.Index (ix)
 import FRP.Stream as Stream
-import Geometry (Vec2, CanvasMouseEvent)
+import Geometry (CanvasMouseEvent, TransformMatrix, Vec2)
 import Loglude.Data.BiHashMap (_atBiHashMap, _atBiHashMapConnection)
 import Loglude.Run.ExternalState (EXTERNAL_STATE, modifying, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
@@ -87,6 +87,7 @@ type EditorState =
     , mousePosition :: Vec2
     , nextId :: Natural
     , pointerEventsEnabled :: Boolean
+    , camera :: TransformMatrix
     }
 
 ---------- Helpers
@@ -112,6 +113,9 @@ selectionToNodeId (SelectedNode id) = Just $ NodeGeometry id
 selectionToNodeId _ = Nothing
 
 ---------- Lenses
+_camera :: Lens' EditorState TransformMatrix
+_camera = prop (Proxy :: _ "camera")
+
 _pointerEventsEnabled :: Lens' EditorState Boolean
 _pointerEventsEnabled = prop (Proxy :: _ "pointerEventsEnabled")
 

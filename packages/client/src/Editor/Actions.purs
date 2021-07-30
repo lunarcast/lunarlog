@@ -8,12 +8,14 @@ import Data.HashSet as HashSet
 import Data.Vec as Vec
 import Geometry (CanvasMouseEvent, Context2D, _position)
 import Geometry.Tea (TeaM, absoluteBounds, awaitRerender, currentlyHovered)
+import Geometry.Transform (multiplyVector)
+import Geometry.Transform as Transform
 import Loglude.Data.BiHashMap as BiHashMap
 import Loglude.Run.ExternalState (EXTERNAL_STATE, assign, get, gets, modifying, preuse, put, runFocused, use)
 import Lunarlog.Client.VisualGraph.Types as VisualGraph
 import Lunarlog.Core.NodeGraph (NodeId(..), PinId)
 import Lunarlog.Core.NodeGraph as NodeGraph
-import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, PatternShape, Selection(..), ForeignSubstitution, _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _currentRule, _hovered, _module, _mousePosition, _nextId, _pointerEventsEnabled, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
+import Lunarlog.Editor.Types (BranchPath, EditorAction, EditorGeometryId(..), EditorState, ForeignSubstitution, PatternShape, Selection(..), _atBranch, _atRuleConnection, _atRuleConnectionPair, _atRuleNode, _atVisualRuleNode, _camera, _currentRule, _hovered, _module, _mousePosition, _nextId, _pointerEventsEnabled, _ruleBody, _ruleHead, _ruleNode, _ruleNodes, _selection, _visualRuleNode, freshNode, freshPin, selectionToNodeId)
 import Lunarlog.Expression (freeVarsConstructor)
 import Lunarlog.Expression as Expression
 import Lunarlog.Parser.Cst as Cst
@@ -122,7 +124,9 @@ usesPointerEvents computation = do
 
 -- | Create some basic position data about a node
 createVisualPattern :: NodeId -> ClientM Unit
-createVisualPattern nodeId = assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position: vec2 200.0 200.0 }
+createVisualPattern nodeId = do
+    camera <- use _camera
+    assign (_atVisualRuleNode nodeId) $ Just $ VisualGraph.PatternNode { position: multiplyVector (Transform.inverse camera) $ vec2 200.0 200.0 }
 
 -- | Create an empty branch
 createBranch :: BranchPath -> PatternShape -> ClientM Unit
